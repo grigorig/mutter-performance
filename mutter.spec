@@ -4,17 +4,17 @@
 %global json_glib_version 0.12.0
 %global libinput_version 1.4
 %global pipewire_version 0.3.0
-%global mutter_api_version 7
+%global mutter_api_version 8
 
 Name:          mutter
-Version:       3.38.1
+Version:       40.0~alpha
 Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/3.38/%{name}-%{version}.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -122,7 +122,7 @@ The %{name}-tests package contains tests that can be used to verify
 the functionality of the installed %{name} package.
 
 %prep
-%autosetup -S git
+%autosetup -S git -n %{name}-40.alpha
 
 %build
 %meson -Degl_device=true -Dwayland_eglstream=true -Dxwayland_initfd=disabled
@@ -164,6 +164,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Dec 02 2020 Florian Müllner <fmuellner@redhat.com> - 40.alpha-1
+- Update to 40.alpha
+
 * Mon Oct 05 2020 Florian Müllner <fmuellner@redhat.com> - 3.38.1-1
 - Update to 3.38.1
 
