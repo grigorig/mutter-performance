@@ -19,6 +19,9 @@ Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.beta.tar.
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
 
+# To make s390x build pass
+Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
+
 BuildRequires: chrpath
 BuildRequires: pango-devel
 BuildRequires: startup-notification-devel
