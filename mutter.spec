@@ -1,20 +1,20 @@
 %global gtk3_version 3.19.8
 %global glib_version 2.53.2
-%global gsettings_desktop_schemas_version 3.33.0
+%global gsettings_desktop_schemas_version 40~alpha
 %global json_glib_version 0.12.0
 %global libinput_version 1.4
 %global pipewire_version 0.3.0
 %global mutter_api_version 8
 
 Name:          mutter
-Version:       40.0~alpha.1
+Version:       40.0~alpha.1.1
 Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.1.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.1.1.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -122,7 +122,7 @@ The %{name}-tests package contains tests that can be used to verify
 the functionality of the installed %{name} package.
 
 %prep
-%autosetup -S git -n %{name}-40.alpha.1
+%autosetup -S git -n %{name}-40.alpha.1.1
 
 %build
 %meson -Degl_device=true -Dwayland_eglstream=true -Dxwayland_initfd=disabled
@@ -164,7 +164,10 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
-* Thu Jan 14 2020 Florian Müllner <fmuellner@redhat.com> - 40.0~alpha.1-1
+* Thu Jan 14 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~alpha.1.1-1
+- Update to 40.alpha.1.1 to adjust for GSettings schema changes in g-s-d
+
+* Thu Jan 14 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~alpha.1-1
 - Update to 40.alpha.1
 
 * Wed Dec 02 2020 Florian Müllner <fmuellner@redhat.com> - 40.alpha-1
