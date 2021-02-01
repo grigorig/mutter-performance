@@ -8,7 +8,7 @@
 
 Name:          mutter
 Version:       40.0~alpha.1.1
-Release:       2%{?dist}
+Release:       3%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -73,7 +73,7 @@ BuildRequires: pkgconfig(wayland-eglstream)
 BuildRequires: json-glib-devel >= %{json_glib_version}
 BuildRequires: libgudev1-devel
 BuildRequires: libinput-devel >= %{libinput_version}
-BuildRequires: xorg-x11-server-Xwayland
+BuildRequires: pkgconfig(xwayland)
 
 Obsoletes: mutter-wayland < 3.13.0
 Obsoletes: mutter-wayland-devel < 3.13.0
@@ -125,7 +125,7 @@ the functionality of the installed %{name} package.
 %autosetup -S git -n %{name}-40.alpha.1.1
 
 %build
-%meson -Degl_device=true -Dwayland_eglstream=true -Dxwayland_initfd=disabled
+%meson -Degl_device=true -Dwayland_eglstream=true
 %meson_build
 
 %install
@@ -164,6 +164,10 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Feb  1 2021 Olivier Fourdan <ofourdan@redhat.com> - 40.0~alpha.1.1-3
+- Add build dependency on Xwayland-devel package (from Xwayland standalone)
+- Do not explicitly disable initfd support.
+
 * Tue Jan 26 2021 Fedora Release Engineering <releng@fedoraproject.org> - 40.0~alpha.1.1-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
 
