@@ -8,13 +8,13 @@
 
 Name:          mutter
 Version:       40.0~alpha.1.1
-Release:       3%{?dist}
+Release:       4.20210202gita9d9aee6c%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.1.1.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.1.1-214-ga9d9aee6c.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -122,7 +122,7 @@ The %{name}-tests package contains tests that can be used to verify
 the functionality of the installed %{name} package.
 
 %prep
-%autosetup -S git -n %{name}-40.alpha.1.1
+%autosetup -S git -n %{name}-40.beta
 
 %build
 %meson -Degl_device=true -Dwayland_eglstream=true
@@ -164,6 +164,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Feb 02 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~alpha.1.1-4.20210202gita9d9aee6c
+- Build snapshot of current upstream
+
 * Mon Feb  1 2021 Olivier Fourdan <ofourdan@redhat.com> - 40.0~alpha.1.1-3
 - Add build dependency on Xwayland-devel package (from Xwayland standalone)
 - Do not explicitly disable initfd support.
