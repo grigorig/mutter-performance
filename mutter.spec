@@ -7,14 +7,14 @@
 %global mutter_api_version 8
 
 Name:          mutter
-Version:       40.0~alpha.1.1
-Release:       4.20210202gita9d9aee6c%{?dist}
+Version:       40.0~beta
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.alpha.1.1-214-ga9d9aee6c.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.beta.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -164,6 +164,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Feb 22 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~beta-1
+- Update to 40.beta
+
 * Tue Feb 02 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~alpha.1.1-4.20210202gita9d9aee6c
 - Build snapshot of current upstream
 
