@@ -52,6 +52,7 @@ BuildRequires: pkgconfig(graphene-gobject-1.0)
 BuildRequires: pam-devel
 BuildRequires: pkgconfig(libpipewire-0.3) >= %{pipewire_version}
 BuildRequires: pkgconfig(sysprof-capture-4)
+BuildRequires: sysprof-devel
 BuildRequires: systemd-devel
 BuildRequires: upower-devel
 BuildRequires: xorg-x11-server-Xorg
