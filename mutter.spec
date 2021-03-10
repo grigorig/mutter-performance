@@ -8,7 +8,7 @@
 
 Name:          mutter
 Version:       40.0~beta
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -21,6 +21,9 @@ Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
 
 # To make s390x build pass
 Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
+
+# Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
+Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -168,6 +171,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Mar 09 2021 Adam Williamson <awilliam@redhat.com> - 40.0~beta-2
+- Add a workaround for RHBZ#1936991 (disable atomic KMS on tegra)
+
 * Mon Feb 22 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~beta-1
 - Update to 40.beta
 
