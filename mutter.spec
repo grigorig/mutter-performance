@@ -7,14 +7,14 @@
 %global mutter_api_version 8
 
 Name:          mutter
-Version:       40.0~beta
-Release:       3%{?dist}
+Version:       40.0~rc
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.beta.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.rc.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -24,9 +24,6 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
-
-# Pull in Xwayland autostart fix for non-systemd startup
-Patch3:        0001-main-Force-Xwayland-startup-if-not-on-systemd.patch
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -135,7 +132,7 @@ The %{name}-tests package contains tests that can be used to verify
 the functionality of the installed %{name} package.
 
 %prep
-%autosetup -S git -n %{name}-40.beta
+%autosetup -S git -n %{name}-40.rc
 
 %build
 %meson -Degl_device=true -Dwayland_eglstream=true
@@ -177,6 +174,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Mar 15 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~rc-1
+- Update to 40.rc
+
 * Fri Mar 12 2021 Benjamin Berg <bberg@redhat.com> - 40.0~beta-3
 - Pull in Xwayland autostart fix for non-systemd startup
   Resolves: #1924908
