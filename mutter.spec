@@ -6,15 +6,17 @@
 %global pipewire_version 0.3.0
 %global mutter_api_version 8
 
+%global tarball_version %%(echo %{version} | tr '~' '.')
+
 Name:          mutter
-Version:       40.0~rc
+Version:       40.0
 Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 #VCS:          git:git://git.gnome.org/mutter
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-40.rc.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/40/%{name}-%{tarball_version}.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -132,7 +134,7 @@ The %{name}-tests package contains tests that can be used to verify
 the functionality of the installed %{name} package.
 
 %prep
-%autosetup -S git -n %{name}-40.rc
+%autosetup -S git -n %{name}-%{tarball_version}
 
 %build
 %meson -Degl_device=true -Dwayland_eglstream=true
