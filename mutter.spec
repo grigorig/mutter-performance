@@ -176,6 +176,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sat Mar 20 2021 Florian Müllner <fmuellner@redhat.com> - 40.0-1
+- Update to 40.0
+
 * Mon Mar 15 2021 Florian Müllner <fmuellner@redhat.com> - 40.0~rc-1
 - Update to 40.rc
 
