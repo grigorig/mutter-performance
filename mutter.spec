@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.0
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -175,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Fri Mar 26 2021 Kalev Lember <klember@redhat.com> - 40.0-2
+- Rebuild to fix sysprof-capture symbols leaking into libraries consuming it
+
 * Sat Mar 20 2021 Florian Müllner <fmuellner@redhat.com> - 40.0-1
 - Update to 40.0
 
