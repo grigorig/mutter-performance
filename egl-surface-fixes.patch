@@ -1,0 +1,223 @@
+From 751d94b8f1abc1ec94a8f0bb4a9ec358ac5ad1c5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Thu, 25 Mar 2021 15:52:02 +0100
+Subject: [PATCH 1/3] onscreen/native: Remove redundant EGLSurface cleanup
+
+It's handled by CoglOnscreenEgl its dispose() implementation. It was
+failed to be invoked in the past because the old non-GObject web of
+vtables were not setup correctly, meaning the old generic EGL layer of
+the CoglOnscreen de-init was never inovked.
+
+When the type inheritence was cleaned up, this mistake was not cleaned
+up, so do that now.
+---
+ src/backends/native/meta-onscreen-native.c | 44 ----------------------
+ 1 file changed, 44 deletions(-)
+
+diff --git a/src/backends/native/meta-onscreen-native.c b/src/backends/native/meta-onscreen-native.c
+index 53388e3f64..5ca7408114 100644
+--- a/src/backends/native/meta-onscreen-native.c
++++ b/src/backends/native/meta-onscreen-native.c
+@@ -2040,58 +2040,18 @@ meta_onscreen_native_new (MetaRendererNative *renderer_native,
+   return onscreen_native;
+ }
+ 
+-static void
+-destroy_egl_surface (CoglOnscreen *onscreen)
+-{
+-  CoglOnscreenEgl *onscreen_egl = COGL_ONSCREEN_EGL (onscreen);
+-  EGLSurface egl_surface;
+-
+-  egl_surface = cogl_onscreen_egl_get_egl_surface (onscreen_egl);
+-  if (cogl_onscreen_egl_get_egl_surface (onscreen_egl) != EGL_NO_SURFACE)
+-    {
+-      MetaOnscreenNative *onscreen_native = META_ONSCREEN_NATIVE (onscreen);
+-      MetaEgl *egl = meta_onscreen_native_get_egl (onscreen_native);
+-      CoglFramebuffer *framebuffer = COGL_FRAMEBUFFER (onscreen);
+-      CoglContext *cogl_context = cogl_framebuffer_get_context (framebuffer);
+-      CoglRenderer *cogl_renderer = cogl_context->display->renderer;
+-      CoglRendererEGL *cogl_renderer_egl = cogl_renderer->winsys;
+-
+-      meta_egl_destroy_surface (egl,
+-                                cogl_renderer_egl->edpy,
+-                                egl_surface,
+-                                NULL);
+-      cogl_onscreen_egl_set_egl_surface (onscreen_egl, EGL_NO_SURFACE);
+-    }
+-}
+-
+ static void
+ meta_onscreen_native_dispose (GObject *object)
+ {
+   CoglFramebuffer *framebuffer = COGL_FRAMEBUFFER (object);
+   CoglOnscreen *onscreen = COGL_ONSCREEN (framebuffer);
+   CoglContext *cogl_context = cogl_framebuffer_get_context (framebuffer);
+-  CoglDisplay *cogl_display = cogl_context_get_display (cogl_context);
+-  CoglDisplayEGL *cogl_display_egl = cogl_display->winsys;
+-  CoglOnscreenEgl *onscreen_egl = COGL_ONSCREEN_EGL (onscreen);
+   MetaOnscreenNative *onscreen_native = META_ONSCREEN_NATIVE (onscreen);
+   MetaRendererNative *renderer_native = onscreen_native->renderer_native;
+   MetaRendererNativeGpuData *renderer_gpu_data;
+-  EGLSurface egl_surface;
+ 
+   G_OBJECT_CLASS (meta_onscreen_native_parent_class)->dispose (object);
+ 
+-  egl_surface = cogl_onscreen_egl_get_egl_surface (onscreen_egl);
+-  if (egl_surface != EGL_NO_SURFACE &&
+-      (cogl_display_egl->current_draw_surface == egl_surface ||
+-       cogl_display_egl->current_read_surface == egl_surface))
+-    {
+-      if (!_cogl_winsys_egl_make_current (cogl_display,
+-                                          cogl_display_egl->dummy_surface,
+-                                          cogl_display_egl->dummy_surface,
+-                                          cogl_display_egl->egl_context))
+-        g_warning ("Failed to clear current context");
+-    }
+-
+   renderer_gpu_data =
+     meta_renderer_native_get_gpu_data (renderer_native,
+                                        onscreen_native->render_gpu);
+@@ -2104,8 +2064,6 @@ meta_onscreen_native_dispose (GObject *object)
+ 
+       free_current_bo (onscreen);
+ 
+-      destroy_egl_surface (onscreen);
+-
+       g_clear_pointer (&onscreen_native->gbm.surface, gbm_surface_destroy);
+       break;
+     case META_RENDERER_NATIVE_MODE_SURFACELESS:
+@@ -2115,8 +2073,6 @@ meta_onscreen_native_dispose (GObject *object)
+     case META_RENDERER_NATIVE_MODE_EGL_DEVICE:
+       g_clear_object (&onscreen_native->egl.dumb_fb);
+ 
+-      destroy_egl_surface (onscreen);
+-
+       if (onscreen_native->egl.stream != EGL_NO_STREAM_KHR)
+         {
+           MetaEgl *egl = meta_onscreen_native_get_egl (onscreen_native);
+-- 
+2.30.2
+
+
+From 0771f48dbc044469785e700421baabbfe7f57d12 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Thu, 25 Mar 2021 16:22:33 +0100
+Subject: [PATCH 2/3] onscreen/native: Release buffer before destroying
+ EGLSurface
+
+Destroying the EGLSurface frees the underlying container structs. When
+we call gbm_surface_release_buffer() with a gbm_surface the EGLSurface
+was created from, doing that after the EGLSurface was destroyed results
+in attempts to access freed memory. Fix this by releasing any buffer
+first, followed by destroying the EGLSurface, and lastly, the
+gbm_surface.
+
+This was not a problem prior to CoglOnscreen turning into a GObject, as
+in that case, the dispose-chain was not setup correctly, and the
+EGLSurface destruction was done in the native backend implementation.
+---
+ src/backends/native/meta-onscreen-native.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/src/backends/native/meta-onscreen-native.c b/src/backends/native/meta-onscreen-native.c
+index 5ca7408114..12fe57c5d5 100644
+--- a/src/backends/native/meta-onscreen-native.c
++++ b/src/backends/native/meta-onscreen-native.c
+@@ -2050,8 +2050,6 @@ meta_onscreen_native_dispose (GObject *object)
+   MetaRendererNative *renderer_native = onscreen_native->renderer_native;
+   MetaRendererNativeGpuData *renderer_gpu_data;
+ 
+-  G_OBJECT_CLASS (meta_onscreen_native_parent_class)->dispose (object);
+-
+   renderer_gpu_data =
+     meta_renderer_native_get_gpu_data (renderer_native,
+                                        onscreen_native->render_gpu);
+@@ -2063,8 +2061,6 @@ meta_onscreen_native_dispose (GObject *object)
+       g_return_if_fail (onscreen_native->gbm.next_fb == NULL);
+ 
+       free_current_bo (onscreen);
+-
+-      g_clear_pointer (&onscreen_native->gbm.surface, gbm_surface_destroy);
+       break;
+     case META_RENDERER_NATIVE_MODE_SURFACELESS:
+       g_assert_not_reached ();
+@@ -2089,6 +2085,9 @@ meta_onscreen_native_dispose (GObject *object)
+ #endif /* HAVE_EGL_DEVICE */
+     }
+ 
++  G_OBJECT_CLASS (meta_onscreen_native_parent_class)->dispose (object);
++
++  g_clear_pointer (&onscreen_native->gbm.surface, gbm_surface_destroy);
+   g_clear_pointer (&onscreen_native->secondary_gpu_state,
+                    secondary_gpu_state_free);
+ }
+-- 
+2.30.2
+
+
+From 4999c771f147e3ef2c95bad45147d801a38dc458 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Thu, 25 Mar 2021 18:24:10 +0100
+Subject: [PATCH 3/3] onscreen/native: Make sure to reset the EGL context after
+ dGPU blit
+
+On hybrid graphics system, the primary path used to transfer the stage
+framebuffer onto the dedicated GPU's video memory preparing for scanout,
+is using the dedicated GPU to glBlitFramebuffer() the content from the
+iGPU texture onto the scanout buffer.
+
+After we have done this, we reset the current EGL context back to the
+one managed by cogl. What we failed to do, however, was to reset the
+current EGL context when we inhibited the actual page flip due to having
+entered power save mode.
+
+When we later started to paint again, Cogl thought the current EGL
+context was still the correct one, but in fact it was the one used for
+the iGPU -> dGPU blit, causing various EGL surface errors, and as a side
+effect, eventually hitting an assert.
+
+Fix this by making sure we reset to the Cogl managed EGL context also
+for this case.
+---
+ src/backends/native/meta-onscreen-native.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/src/backends/native/meta-onscreen-native.c b/src/backends/native/meta-onscreen-native.c
+index 12fe57c5d5..e3d9a184f5 100644
+--- a/src/backends/native/meta-onscreen-native.c
++++ b/src/backends/native/meta-onscreen-native.c
+@@ -1071,6 +1071,15 @@ meta_onscreen_native_swap_buffers_with_damage (CoglOnscreen  *onscreen,
+ 
+   update_secondary_gpu_state_post_swap_buffers (onscreen, &egl_context_changed);
+ 
++  /*
++   * If we changed EGL context, cogl will have the wrong idea about what is
++   * current, making it fail to set it when it needs to. Avoid that by making
++   * EGL_NO_CONTEXT current now, making cogl eventually set the correct
++   * context.
++   */
++  if (egl_context_changed)
++    _cogl_winsys_egl_ensure_current (cogl_display);
++
+   power_save_mode = meta_monitor_manager_get_power_save_mode (monitor_manager);
+   if (power_save_mode == META_POWER_SAVE_ON)
+     {
+@@ -1089,15 +1098,6 @@ meta_onscreen_native_swap_buffers_with_damage (CoglOnscreen  *onscreen,
+       return;
+     }
+ 
+-  /*
+-   * If we changed EGL context, cogl will have the wrong idea about what is
+-   * current, making it fail to set it when it needs to. Avoid that by making
+-   * EGL_NO_CONTEXT current now, making cogl eventually set the correct
+-   * context.
+-   */
+-  if (egl_context_changed)
+-    _cogl_winsys_egl_ensure_current (cogl_display);
+-
+   COGL_TRACE_BEGIN_SCOPED (MetaRendererNativePostKmsUpdate,
+                            "Onscreen (post pending update)");
+   kms_crtc = meta_crtc_kms_get_kms_crtc (META_CRTC_KMS (onscreen_native->crtc));
+-- 
+2.30.2
+
