@@ -185,7 +185,7 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 * Tue Mar 30 2021 Kalev Lember <klember@redhat.com> - 40.0-4
 - Fix enter, space, backspace keys not working with input methods (#1942294)
 
-* Thu Mar 25 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-3
+* Mon Mar 29 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-3
 - Fix crash on resume (rhbz#1941971)
 
 * Fri Mar 26 2021 Kalev Lember <klember@redhat.com> - 40.0-2
