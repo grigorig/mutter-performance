@@ -1,0 +1,30 @@
+From e3bd764491b65b21650997966b7396879d642b10 Mon Sep 17 00:00:00 2001
+From: Takao Fujiwara <tfujiwar@redhat.com>
+Date: Thu, 25 Mar 2021 17:24:19 +0900
+Subject: [PATCH] clutter/input-method: Calculate evdev_code from keycode
+
+evdev_cocde is forwarded in meta-wayland-keyboard.c:default_grab_key()
+in mutter 40 and clutter_input_method_forward_key() should assign
+evdev_code.
+
+Fixes: https://gitlab.gnome.org/GNOME/mutter/-/issues/1709#
+Part-of: <https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1802>
+---
+ clutter/clutter/clutter-input-method.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/clutter/clutter/clutter-input-method.c b/clutter/clutter/clutter-input-method.c
+index b24df2e80e..ff62925a51 100644
+--- a/clutter/clutter/clutter-input-method.c
++++ b/clutter/clutter/clutter-input-method.c
+@@ -495,6 +495,7 @@ clutter_input_method_forward_key (ClutterInputMethod *im,
+   event->key.modifier_state = state;
+   event->key.keyval = keyval;
+   event->key.hardware_keycode = keycode;
++  event->key.evdev_code = keycode - 8;
+   event->key.unicode_value = clutter_keysym_to_unicode (keyval);
+ 
+   clutter_event_set_device (event, keyboard);
+-- 
+GitLab
+
