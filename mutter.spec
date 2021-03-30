@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.0
-Release:       3%{?dist}
+Release:       4%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -28,6 +28,10 @@ Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 
 # Fix crash on resume (rhbz#1941971)
 Patch3:        egl-surface-fixes.patch
+
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1802
+# Fix enter, space, backspace keys not working with input methods
+Patch4:        1802.patch
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -178,6 +182,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Mar 30 2021 Kalev Lember <klember@redhat.com> - 40.0-4
+- Fix enter, space, backspace keys not working with input methods (#1942294)
+
 * Thu Mar 25 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-3
 - Fix crash on resume (rhbz#1941971)
 
