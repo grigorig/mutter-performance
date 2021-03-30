@@ -90,13 +90,6 @@ BuildRequires: libgudev1-devel
 BuildRequires: libinput-devel >= %{libinput_version}
 BuildRequires: pkgconfig(xwayland)
 
-Obsoletes: mutter-wayland < 3.13.0
-Obsoletes: mutter-wayland-devel < 3.13.0
-
-# Make sure yum updates gnome-shell as well; otherwise we might end up with
-# broken gnome-shell installations due to mutter ABI changes.
-Conflicts: gnome-shell < 3.21.1
-
 Requires: control-center-filesystem
 Requires: gsettings-desktop-schemas%{?_isa} >= %{gsettings_desktop_schemas_version}
 Requires: gnome-settings-daemon
@@ -184,6 +177,7 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %changelog
 * Tue Mar 30 2021 Kalev Lember <klember@redhat.com> - 40.0-4
 - Fix enter, space, backspace keys not working with input methods (#1942294)
+- Drop old obsoletes and conflicts
 
 * Mon Mar 29 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-3
 - Fix crash on resume (rhbz#1941971)
