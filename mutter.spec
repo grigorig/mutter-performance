@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.0
-Release:       4%{?dist}
+Release:       5%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -175,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Apr 07 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-5
+- Fix crash on resume fix regression (rhbz#1946652)
+
 * Tue Mar 30 2021 Kalev Lember <klember@redhat.com> - 40.0-4
 - Fix enter, space, backspace keys not working with input methods (#1942294)
 - Drop old obsoletes and conflicts
