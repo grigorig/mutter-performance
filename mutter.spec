@@ -33,7 +33,6 @@ Patch3:        egl-surface-fixes.patch
 # Fix enter, space, backspace keys not working with input methods
 Patch4:        1802.patch
 
-BuildRequires: chrpath
 BuildRequires: pango-devel
 BuildRequires: startup-notification-devel
 BuildRequires: gnome-desktop3-devel
@@ -74,7 +73,7 @@ BuildRequires: xkeyboard-config-devel
 BuildRequires: zenity
 BuildRequires: desktop-file-utils
 # Bootstrap requirements
-BuildRequires: gtk-doc gnome-common gettext-devel git
+BuildRequires: gtk-doc gettext-devel git-core
 BuildRequires: libcanberra-devel
 BuildRequires: gsettings-desktop-schemas-devel >= %{gsettings_desktop_schemas_version}
 BuildRequires: gnome-settings-daemon-devel
