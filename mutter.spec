@@ -94,13 +94,13 @@ Requires: control-center-filesystem
 Requires: gsettings-desktop-schemas%{?_isa} >= %{gsettings_desktop_schemas_version}
 Requires: gnome-settings-daemon
 Requires: gtk3%{?_isa} >= %{gtk3_version}
+Requires: json-glib%{?_isa} >= %{json_glib_version}
+Requires: libinput%{?_isa} >= %{libinput_version}
 Requires: pipewire%{_isa} >= %{pipewire_version}
 Requires: startup-notification
 Requires: dbus
 Requires: zenity
 
-Requires:      json-glib%{?_isa} >= %{json_glib_version}
-Requires:      libinput%{?_isa} >= %{libinput_version}
 
 Provides: firstboot(windowmanager) = mutter
 
