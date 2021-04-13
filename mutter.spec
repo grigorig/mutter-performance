@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.0
-Release:       5%{?dist}
+Release:       6%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -100,6 +100,7 @@ Requires: startup-notification
 Requires: dbus
 Requires: zenity
 
+Recommends: mesa-dri-drivers%{?_isa}
 
 Provides: firstboot(windowmanager) = mutter
 
@@ -174,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Apr 13 2021 Kalev Lember <klember@redhat.com> - 40.0-6
+- Recommend mesa-dri-drivers
+
 * Wed Apr 07 2021 Jonas Ådahl <jadahl@redhat.com> - 40.0-5
 - Fix crash on resume fix regression (rhbz#1946652)
 
