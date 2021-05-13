@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.0
-Release:       6%{?dist}
+Version:       40.1
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,13 +25,6 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
-
-# Fix crash on resume (rhbz#1941971)
-Patch3:        egl-surface-fixes.patch
-
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1802
-# Fix enter, space, backspace keys not working with input methods
-Patch4:        1802.patch
 
 BuildRequires: pango-devel
 BuildRequires: startup-notification-devel
@@ -173,6 +166,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu May 13 2021 Florian Müllner <fmuellner@redhat.com> - 40.1-1
+- Update to 40.1
+
 * Tue Apr 13 2021 Kalev Lember <klember@redhat.com> - 40.0-6
 - Recommend mesa-dri-drivers
 
