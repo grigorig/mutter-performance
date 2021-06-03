@@ -1,0 +1,175 @@
+diff --git a/cogl/cogl/cogl-bitmap-conversion.c b/cogl/cogl/cogl-bitmap-conversion.c
+index ab8251fc537db95f432bbee334f544e4d5e38148..7cae664273ec46f58b5a8b7655339b16cd14e62d 100644
+--- a/cogl/cogl/cogl-bitmap-conversion.c
++++ b/cogl/cogl/cogl-bitmap-conversion.c
+@@ -345,7 +345,9 @@ _cogl_bitmap_needs_short_temp_buffer (CoglPixelFormat format)
+ 
+     case COGL_PIXEL_FORMAT_RGBA_1010102:
+     case COGL_PIXEL_FORMAT_BGRA_1010102:
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_RGBA_1010102_PRE:
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
+diff --git a/cogl/cogl/cogl-bitmap-packing.h b/cogl/cogl/cogl-bitmap-packing.h
+index f668b0bea3eadb70d6ba9ec8101568206799ccbe..713e90d17bd3e9ae843560585a13552a36229b24 100644
+--- a/cogl/cogl/cogl-bitmap-packing.h
++++ b/cogl/cogl/cogl-bitmap-packing.h
+@@ -396,10 +396,12 @@ G_PASTE (_cogl_unpack_, component_size) (CoglPixelFormat format,
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
+       G_PASTE (_cogl_unpack_bgra_1010102_, component_size) (src, dst, width);
+       break;
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+       G_PASTE (_cogl_unpack_argb_2101010_, component_size) (src, dst, width);
+       break;
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
+       G_PASTE (_cogl_unpack_abgr_2101010_, component_size) (src, dst, width);
+@@ -775,10 +777,12 @@ G_PASTE (_cogl_pack_, component_size) (CoglPixelFormat format,
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
+       G_PASTE (_cogl_pack_bgra_1010102_, component_size) (src, dst, width);
+       break;
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+       G_PASTE (_cogl_pack_argb_2101010_, component_size) (src, dst, width);
+       break;
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
+       G_PASTE (_cogl_pack_abgr_2101010_, component_size) (src, dst, width);
+diff --git a/cogl/cogl/cogl-pixel-format.c b/cogl/cogl/cogl-pixel-format.c
+index 05169b9559f492a7df60f8243db1dedb05d15794..06fe79cade4a32fbbba31b934f33d8467de608fd 100644
+--- a/cogl/cogl/cogl-pixel-format.c
++++ b/cogl/cogl/cogl-pixel-format.c
+@@ -161,6 +161,13 @@ static const CoglPixelFormatInfo format_info_table[] = {
+     .aligned = 0,
+     .bpp = { 4 },
+   },
++  {
++    .cogl_format = COGL_PIXEL_FORMAT_XRGB_2101010,
++    .format_str = "XRGB_2101010",
++    .n_planes = 1,
++    .aligned = 0,
++    .bpp = { 4 },
++  },
+   {
+     .cogl_format = COGL_PIXEL_FORMAT_ARGB_2101010,
+     .format_str = "ARGB_2101010",
+@@ -168,6 +175,13 @@ static const CoglPixelFormatInfo format_info_table[] = {
+     .aligned = 0,
+     .bpp = { 4 },
+   },
++  {
++    .cogl_format = COGL_PIXEL_FORMAT_XBGR_2101010,
++    .format_str = "XBGR_2101010",
++    .n_planes = 1,
++    .aligned = 0,
++    .bpp = { 4 },
++  },
+   {
+     .cogl_format = COGL_PIXEL_FORMAT_ABGR_2101010,
+     .format_str = "ABGR_2101010",
+diff --git a/cogl/cogl/cogl-pixel-format.h b/cogl/cogl/cogl-pixel-format.h
+index 7ef03d3fda5b32ab2e24f0b74a5dfde2500c782d..20e75c69a4a143b88db0baf4d9041711d6e7a731 100644
+--- a/cogl/cogl/cogl-pixel-format.h
++++ b/cogl/cogl/cogl-pixel-format.h
+@@ -219,6 +219,9 @@ typedef enum /*< prefix=COGL_PIXEL_FORMAT >*/
+   COGL_PIXEL_FORMAT_ARGB_8888     = (3 | COGL_A_BIT | COGL_AFIRST_BIT),
+   COGL_PIXEL_FORMAT_ABGR_8888     = (3 | COGL_A_BIT | COGL_BGR_BIT | COGL_AFIRST_BIT),
+ 
++  COGL_PIXEL_FORMAT_XRGB_2101010  = (13 | COGL_AFIRST_BIT),
++  COGL_PIXEL_FORMAT_XBGR_2101010  = (13 | COGL_BGR_BIT | COGL_AFIRST_BIT),
++
+   COGL_PIXEL_FORMAT_RGBA_1010102  = (13 | COGL_A_BIT),
+   COGL_PIXEL_FORMAT_BGRA_1010102  = (13 | COGL_A_BIT | COGL_BGR_BIT),
+   COGL_PIXEL_FORMAT_ARGB_2101010  = (13 | COGL_A_BIT | COGL_AFIRST_BIT),
+diff --git a/cogl/cogl/driver/gl/gl/cogl-driver-gl.c b/cogl/cogl/driver/gl/gl/cogl-driver-gl.c
+index 35577518d0e26ebe35f3dc82d5e6d0a860447b59..0c1f39df688ee712bd4496461b1244a3fd079073 100644
+--- a/cogl/cogl/driver/gl/gl/cogl-driver-gl.c
++++ b/cogl/cogl/driver/gl/gl/cogl-driver-gl.c
+@@ -253,6 +253,7 @@ _cogl_driver_pixel_format_to_gl (CoglContext     *context,
+       gltype = GL_UNSIGNED_INT_10_10_10_2;
+       break;
+ 
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
+       glintformat = GL_RGBA;
+@@ -260,6 +261,7 @@ _cogl_driver_pixel_format_to_gl (CoglContext     *context,
+       gltype = GL_UNSIGNED_INT_2_10_10_10_REV;
+       break;
+ 
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+       glintformat = GL_RGBA;
+diff --git a/cogl/cogl/driver/gl/gl/cogl-texture-driver-gl.c b/cogl/cogl/driver/gl/gl/cogl-texture-driver-gl.c
+index 5e95d05a74f11acece87f690412c39b6ca365610..d411c58323721bd5e747ebafcf9d9e8d1be865eb 100644
+--- a/cogl/cogl/driver/gl/gl/cogl-texture-driver-gl.c
++++ b/cogl/cogl/driver/gl/gl/cogl-texture-driver-gl.c
+@@ -413,8 +413,10 @@ _cogl_texture_driver_upload_supported (CoglContext *ctx,
+     case COGL_PIXEL_FORMAT_RGBA_1010102_PRE:
+     case COGL_PIXEL_FORMAT_BGRA_1010102:
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+     case COGL_PIXEL_FORMAT_RGBA_8888:
+diff --git a/cogl/cogl/driver/gl/gles/cogl-driver-gles.c b/cogl/cogl/driver/gl/gles/cogl-driver-gles.c
+index 3e8ea8a0a2a3f01ea3e80247c3737ab7aba81d25..2ded6f8c26a35aff58b9f6b96dee8237ffd39ab9 100644
+--- a/cogl/cogl/driver/gl/gles/cogl-driver-gles.c
++++ b/cogl/cogl/driver/gl/gles/cogl-driver-gles.c
+@@ -158,8 +158,10 @@ _cogl_driver_pixel_format_to_gl (CoglContext     *context,
+ #endif
+     case COGL_PIXEL_FORMAT_BGRA_1010102:
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+ #if G_BYTE_ORDER == G_LITTLE_ENDIAN
+diff --git a/cogl/cogl/driver/gl/gles/cogl-texture-driver-gles.c b/cogl/cogl/driver/gl/gles/cogl-texture-driver-gles.c
+index 904d39d345658aeb16d650327c2f67c92de05b11..b9f396c9b792ee9dc4be83dfda0556f50bab52e5 100644
+--- a/cogl/cogl/driver/gl/gles/cogl-texture-driver-gles.c
++++ b/cogl/cogl/driver/gl/gles/cogl-texture-driver-gles.c
+@@ -457,8 +457,10 @@ _cogl_texture_driver_upload_supported (CoglContext *ctx,
+     case COGL_PIXEL_FORMAT_RGBA_1010102_PRE:
+     case COGL_PIXEL_FORMAT_BGRA_1010102:
+     case COGL_PIXEL_FORMAT_BGRA_1010102_PRE:
++    case COGL_PIXEL_FORMAT_XBGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010:
+     case COGL_PIXEL_FORMAT_ABGR_2101010_PRE:
++    case COGL_PIXEL_FORMAT_XRGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010:
+     case COGL_PIXEL_FORMAT_ARGB_2101010_PRE:
+ #if G_BYTE_ORDER == G_LITTLE_ENDIAN
+diff --git a/src/wayland/meta-wayland-dma-buf.c b/src/wayland/meta-wayland-dma-buf.c
+index ce89837411bdb6e3de52c279a5902735b938cf47..0d37a12a983502f423069359af8e09e4640f40fc 100644
+--- a/src/wayland/meta-wayland-dma-buf.c
++++ b/src/wayland/meta-wayland-dma-buf.c
+@@ -119,11 +119,14 @@ meta_wayland_dma_buf_realize_texture (MetaWaylandBuffer  *buffer,
+       cogl_format = COGL_PIXEL_FORMAT_ARGB_8888_PRE;
+       break;
+     case DRM_FORMAT_XRGB2101010:
+-      cogl_format = COGL_PIXEL_FORMAT_ARGB_2101010;
++      cogl_format = COGL_PIXEL_FORMAT_XRGB_2101010;
+       break;
+     case DRM_FORMAT_ARGB2101010:
+       cogl_format = COGL_PIXEL_FORMAT_ARGB_2101010_PRE;
+       break;
++    case DRM_FORMAT_XBGR2101010:
++      cogl_format = COGL_PIXEL_FORMAT_XBGR_2101010;
++      break;
+     case DRM_FORMAT_ABGR2101010:
+       cogl_format = COGL_PIXEL_FORMAT_ABGR_2101010_PRE;
+       break;

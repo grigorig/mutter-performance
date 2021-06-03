@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.1
-Release:       2%{?dist}
+Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -31,6 +31,15 @@ Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 # Fix file descriptor leak
 # Fix remote desktop input events
 Patch3:        post-40.1-patches.patch
+
+# Enable RT priority by default
+Patch4:        rt-default.diff
+
+# Perf under load
+Patch5:        1241-rebased.diff
+
+# Opaque pixel formats
+Patch6:        1810.diff
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -174,6 +183,10 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Jun 03 2021 Grigori Goronzy <greg@kinoho.net> - 40.1-100
+- Add performance patches
+- Add bugfixes
+
 * Tue Jun 01 2021 Jonas Ådahl <jadahl@redhat.com> - 40.1-2
 - Fix broken graphics on radeon (rhbz#1960937)
 - Fix file descriptor leak
