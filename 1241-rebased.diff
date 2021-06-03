@@ -1,5 +1,5 @@
 diff --git a/clutter/clutter/clutter-frame-clock.c b/clutter/clutter/clutter-frame-clock.c
-index 05e79e662..a5740e261 100644
+index 05e79e662..fb356d463 100644
 --- a/clutter/clutter/clutter-frame-clock.c
 +++ b/clutter/clutter/clutter-frame-clock.c
 @@ -55,7 +55,6 @@ typedef enum _ClutterFrameClockState
@@ -39,7 +39,16 @@ index 05e79e662..a5740e261 100644
        frame_clock->state = CLUTTER_FRAME_CLOCK_STATE_IDLE;
        maybe_reschedule_update (frame_clock);
        break;
-@@ -213,7 +216,6 @@ clutter_frame_clock_notify_ready (ClutterFrameClock *frame_clock)
+@@ -205,6 +208,8 @@ clutter_frame_clock_notify_presented (ClutterFrameClock *frame_clock,
+ void
+ clutter_frame_clock_notify_ready (ClutterFrameClock *frame_clock)
+ {
++  frame_clock->pending_presented = FALSE;
++
+   switch (frame_clock->state)
+     {
+     case CLUTTER_FRAME_CLOCK_STATE_INIT:
+@@ -213,7 +218,6 @@ clutter_frame_clock_notify_ready (ClutterFrameClock *frame_clock)
        g_warn_if_reached ();
        break;
      case CLUTTER_FRAME_CLOCK_STATE_DISPATCHING:
@@ -47,7 +56,7 @@ index 05e79e662..a5740e261 100644
        frame_clock->state = CLUTTER_FRAME_CLOCK_STATE_IDLE;
        maybe_reschedule_update (frame_clock);
        break;
-@@ -383,7 +385,6 @@ clutter_frame_clock_inhibit (ClutterFrameClock *frame_clock)
+@@ -383,7 +387,6 @@ clutter_frame_clock_inhibit (ClutterFrameClock *frame_clock)
            frame_clock->state = CLUTTER_FRAME_CLOCK_STATE_IDLE;
            break;
          case CLUTTER_FRAME_CLOCK_STATE_DISPATCHING:
@@ -55,7 +64,7 @@ index 05e79e662..a5740e261 100644
            break;
          }
  
-@@ -423,7 +424,6 @@ clutter_frame_clock_schedule_update_now (ClutterFrameClock *frame_clock)
+@@ -423,7 +426,6 @@ clutter_frame_clock_schedule_update_now (ClutterFrameClock *frame_clock)
      case CLUTTER_FRAME_CLOCK_STATE_SCHEDULED:
        return;
      case CLUTTER_FRAME_CLOCK_STATE_DISPATCHING:
@@ -63,7 +72,7 @@ index 05e79e662..a5740e261 100644
        frame_clock->pending_reschedule = TRUE;
        frame_clock->pending_reschedule_now = TRUE;
        return;
-@@ -462,7 +462,6 @@ clutter_frame_clock_schedule_update (ClutterFrameClock *frame_clock)
+@@ -462,7 +464,6 @@ clutter_frame_clock_schedule_update (ClutterFrameClock *frame_clock)
      case CLUTTER_FRAME_CLOCK_STATE_SCHEDULED:
        return;
      case CLUTTER_FRAME_CLOCK_STATE_DISPATCHING:
@@ -71,7 +80,7 @@ index 05e79e662..a5740e261 100644
        frame_clock->pending_reschedule = TRUE;
        return;
      }
-@@ -489,30 +488,37 @@ clutter_frame_clock_dispatch (ClutterFrameClock *frame_clock,
+@@ -489,30 +490,37 @@ clutter_frame_clock_dispatch (ClutterFrameClock *frame_clock,
  
    frame_count = frame_clock->frame_count++;
  
@@ -125,7 +134,7 @@ index 05e79e662..a5740e261 100644
        g_warn_if_reached ();
        break;
      case CLUTTER_FRAME_CLOCK_STATE_IDLE:
-@@ -522,13 +528,14 @@ clutter_frame_clock_dispatch (ClutterFrameClock *frame_clock,
+@@ -522,13 +530,14 @@ clutter_frame_clock_dispatch (ClutterFrameClock *frame_clock,
        switch (result)
          {
          case CLUTTER_FRAME_RESULT_PENDING_PRESENTED:
