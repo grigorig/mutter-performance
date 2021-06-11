@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.2
-Release:       100%{?dist}
+Release:       101%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -30,7 +30,7 @@ Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 Patch4:        rt-default.diff
 
 # Perf under load
-Patch5:        1241-rebased.diff
+# Patch5:        1241-rebased.diff
 
 # Opaque pixel formats
 Patch6:        1810.diff
@@ -177,6 +177,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-101
+- Disable !1241 (it's buggy)
+
 * Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-100
 - Merge upstream
 
