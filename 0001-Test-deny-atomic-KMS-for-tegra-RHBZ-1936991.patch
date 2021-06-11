@@ -1,4 +1,4 @@
-From f1f55d341939f916aa533a28cbaabb10e9d8566c Mon Sep 17 00:00:00 2001
+From ac7f1c64e3b12ba74e5138805e334016b40e6629 Mon Sep 17 00:00:00 2001
 From: Adam Williamson <awilliam@redhat.com>
 Date: Tue, 9 Mar 2021 17:21:59 -0800
 Subject: [PATCH] Test: deny atomic KMS for "tegra" (RHBZ #1936991)
@@ -10,13 +10,13 @@ Signed-off-by: Adam Williamson <awilliam@redhat.com>
  2 files changed, 2 insertions(+)
 
 diff --git a/data/61-mutter.rules b/data/61-mutter.rules
-index bfe63a8e9..ea7740833 100644
+index edc03e6c1..d8e3c5f00 100644
 --- a/data/61-mutter.rules
 +++ b/data/61-mutter.rules
-@@ -2,3 +2,4 @@ DRIVERS=="i915", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
- DRIVERS=="nouveau", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
+@@ -3,3 +3,4 @@ DRIVERS=="nouveau", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
  DRIVERS=="amdgpu", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
- DRIVER=="vkms", SUBSYSTEM=="platform", TAG+="mutter-device-ignore"
+ DRIVERS=="radeon", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
+ ENV{ID_PATH}=="platform-vkms", TAG+="mutter-device-ignore"
 +DRIVER=="tegra", SUBSYSTEM=="platform", TAG+="mutter-device-disable-atomic-kms"
 diff --git a/src/backends/native/meta-kms-device.c b/src/backends/native/meta-kms-device.c
 index c388096d5..ef65cf82b 100644
