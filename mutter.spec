@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.2
-Release:       101%{?dist}
+Version:       40.2.1
+Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -177,9 +177,22 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Jun 16 2021 Grigori Goronzy <greg@kinoho.net> - 40.2.1-100
+- Merge upstream
+
 * Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-101
 - Disable !1241 (it's buggy)
 
+* Mon Jun 14 2021 Florian Müllner <fmuellner@redhat.com> - 40.2.1-1
+- Update to 40.2.1
+
+* Sun Jun 13 2021 Jonas Ådahl <jadahl@redhat.com> - 40.2-2
+- Fix crash regression
+  Resolves: #1971193
+  Resolves: #1971184
+  Resolves: #1971176
+  Resolves: #1971158
+  
 * Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-100
 - Merge upstream
 
