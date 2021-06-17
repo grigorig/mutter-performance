@@ -97,6 +97,11 @@ Requires:      libinput%{?_isa} >= %{libinput_version}
 
 Provides: firstboot(windowmanager) = mutter
 
+# Cogl and Clutter were forked at these versions, but have diverged
+# significantly since then.
+Provides: bundled(cogl) = 1.22.0
+Provides: bundled(clutter) = 1.26.0
+
 %description
 Mutter is a window and compositing manager that displays and manages
 your desktop via OpenGL. Mutter combines a sophisticated display engine
