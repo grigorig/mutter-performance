@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.2.1
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,6 +25,9 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
+
+# Upstream fix for libwacom tablet mapping to monitor
+Patch3:        0001-input-mapper-Fix-libwacom-tablet-mapping-to-monitor.patch
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -173,6 +176,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sat Jul 03 2021 Andrey Brusnik <dev@shdwchn.io> - 40.2.1-2
+- Upstream fix for libwacom tablet mapping to monitor
+
 * Mon Jun 14 2021 Florian Müllner <fmuellner@redhat.com> - 40.2.1-1
 - Update to 40.2.1
 

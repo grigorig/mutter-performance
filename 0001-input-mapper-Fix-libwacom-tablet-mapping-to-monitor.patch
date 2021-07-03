@@ -1,0 +1,55 @@
+From 4b0fd9ab76aa587300cb652e34ca5679db81080e Mon Sep 17 00:00:00 2001
+From: Christoph Trassl <christoph+qqkrukwkh@trassl.net>
+Date: Thu, 1 Jul 2021 06:07:53 +0200
+Subject: [PATCH] input-mapper: Fix (libwacom) tablet mapping to monitor
+
+Remove early return when using libwacom, so guess_candidates returns
+monitor candidates for those devices, too.
+
+Additionally, changing the output of an input requires removing the
+input from its current output first.
+
+Closes: https://gitlab.gnome.org/GNOME/mutter/-/issues/1712
+Part-of: <https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1887>
+---
+ src/backends/meta-input-mapper.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/backends/meta-input-mapper.c b/src/backends/meta-input-mapper.c
+index 2a41a7508..ffbe2dd37 100644
+--- a/src/backends/meta-input-mapper.c
++++ b/src/backends/meta-input-mapper.c
+@@ -116,6 +116,9 @@ enum
+ 
+ static guint signals[N_SIGNALS] = { 0, };
+ 
++static void mapper_output_info_remove_input (MetaMapperOutputInfo *output,
++                                             MetaMapperInputInfo  *input);
++
+ static void mapper_recalculate_input (MetaInputMapper     *mapper,
+                                       MetaMapperInputInfo *input);
+ 
+@@ -166,6 +169,9 @@ settings_output_changed_cb (GSettings           *settings,
+                             const char          *key,
+                             MetaMapperInputInfo *info)
+ {
++  if (info->output != NULL)
++    mapper_output_info_remove_input (info->output, info);
++
+   mapper_recalculate_input (info->mapper, info);
+ }
+ 
+@@ -492,10 +498,6 @@ guess_candidates (MetaInputMapper     *mapper,
+         {
+           flags = libwacom_get_integration_flags (wacom_device);
+ 
+-          if ((flags & (WACOM_DEVICE_INTEGRATED_SYSTEM |
+-                        WACOM_DEVICE_INTEGRATED_DISPLAY)) == 0)
+-            return;
+-
+           integrated = (flags & (WACOM_DEVICE_INTEGRATED_SYSTEM |
+                                  WACOM_DEVICE_INTEGRATED_DISPLAY)) != 0;
+           builtin = (flags & WACOM_DEVICE_INTEGRATED_SYSTEM) != 0;
+-- 
+2.31.1
+
