@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.3
-Release:       100%{?dist}
+Release:       101%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -34,6 +34,9 @@ Patch4:        rt-default.diff
 
 # Opaque pixel formats
 Patch6:        1810.diff
+
+# Latency reduction
+Patch7:        1762.diff
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -182,6 +185,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Jul 21 2021 Grigori Goronzy <greg@kinoho.net> - 40.3-100
+- Add !1762
+
 * Wed Jul 20 2021 Grigori Goronzy <greg@kinoho.net> - 40.3-100
 - Merge upstream
 
