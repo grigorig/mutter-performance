@@ -9,7 +9,7 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.2.1
+Version:       40.3
 Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
@@ -106,6 +106,11 @@ Requires:      libinput%{?_isa} >= %{libinput_version}
 
 Provides: firstboot(windowmanager) = mutter
 
+# Cogl and Clutter were forked at these versions, but have diverged
+# significantly since then.
+Provides: bundled(cogl) = 1.22.0
+Provides: bundled(clutter) = 1.26.0
+
 %description
 Mutter is a window and compositing manager that displays and manages
 your desktop via OpenGL. Mutter combines a sophisticated display engine
@@ -177,11 +182,14 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
-* Wed Jun 16 2021 Grigori Goronzy <greg@kinoho.net> - 40.2.1-100
+* Wed Jul 20 2021 Grigori Goronzy <greg@kinoho.net> - 40.3-100
 - Merge upstream
 
-* Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-101
-- Disable !1241 (it's buggy)
+* Mon Jul 12 2021 Florian Müllner <fmuellner@redhat.com> - 40.3-1
+- Update to 40.3
+
+* Sat Jul 03 2021 Andrey Brusnik <dev@shdwchn.io> - 40.2.1-2
+- Upstream fix for libwacom tablet mapping to monitor
 
 * Mon Jun 14 2021 Florian Müllner <fmuellner@redhat.com> - 40.2.1-1
 - Update to 40.2.1
@@ -192,6 +200,12 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
   Resolves: #1971184
   Resolves: #1971176
   Resolves: #1971158
+  
+* Wed Jun 16 2021 Grigori Goronzy <greg@kinoho.net> - 40.2.1-100
+- Merge upstream
+
+* Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-101
+- Disable !1241 (it's buggy)
   
 * Fri Jun 11 2021 Grigori Goronzy <greg@kinoho.net> - 40.2-100
 - Merge upstream
