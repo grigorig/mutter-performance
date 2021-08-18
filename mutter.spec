@@ -4,13 +4,13 @@
 %global json_glib_version 0.12.0
 %global libinput_version 1.4
 %global pipewire_version 0.3.0
-%global mutter_api_version 8
+%global mutter_api_version 9
 
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.3
-Release:       2%{?dist}
+Version:       41~beta
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -171,6 +171,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Aug 18 2021 Florian Müllner <fmuellner@redhat.com> - 41~beta
+- Update to 41.beta
+
 * Thu Jul 22 2021 Fedora Release Engineering <releng@fedoraproject.org> - 40.3-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
 
