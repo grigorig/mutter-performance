@@ -1,0 +1,13 @@
+diff --git a/src/compositor/meta-shaped-texture.c b/src/compositor/meta-shaped-texture.c
+index 6a8af828f..1d26f9af2 100644
+--- a/src/compositor/meta-shaped-texture.c
++++ b/src/compositor/meta-shaped-texture.c
+@@ -670,7 +670,7 @@ do_paint_content (MetaShapedTexture   *stex,
+ 
+   /* Limit to how many separate rectangles we'll draw; beyond this just
+    * fall back and draw the whole thing */
+-#define MAX_RECTS 16
++#define MAX_RECTS 32
+ 
+   if (blended_tex_region)
+     {
