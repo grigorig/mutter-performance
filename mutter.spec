@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.3
-Release:       102%{?dist}
+Version:       40.4
+Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -188,6 +188,12 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Fri Aug 20 2021 Grigori Goronzy <greg@kinoho.net> - 40.4-100
+- Merge upstream
+
+* Wed Aug 18 2021 Florian Müllner <fmuellner@redhat.com> - 40.4-1
+- Update to 40.4
+
 * Sat Jul 24 2021 Grigori Goronzy <greg@kinoho.net> - 40.3-102
 - Add patch to increase max. number of opaque region rects (see #1654)
 
