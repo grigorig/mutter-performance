@@ -62,6 +62,7 @@ BuildRequires: sysprof-devel
 BuildRequires: systemd-devel
 BuildRequires: upower-devel
 BuildRequires: xorg-x11-server-Xorg
+BuildRequires: xorg-x11-server-Xvfb
 BuildRequires: xkeyboard-config-devel
 BuildRequires: zenity
 BuildRequires: desktop-file-utils
