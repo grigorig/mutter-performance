@@ -29,9 +29,6 @@ Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 # Enable RT priority by default
 Patch4:        rt-default.diff
 
-# Perf under load
-# Patch5:        1241-rebased.diff
-
 # Opaque pixel formats
 Patch6:        1810.diff
 
