@@ -1,0 +1,2427 @@
+diff --git a/src/compositor/meta-window-actor-wayland.c b/src/compositor/meta-window-actor-wayland.c
+index b1fe61641..91ce1d936 100644
+--- a/src/compositor/meta-window-actor-wayland.c
++++ b/src/compositor/meta-window-actor-wayland.c
+@@ -73,7 +73,7 @@ meta_window_actor_wayland_rebuild_surface_tree (MetaWindowActor *actor)
+     meta_window_actor_get_surface (actor);
+   MetaWaylandSurface *surface = meta_surface_actor_wayland_get_surface (
+     META_SURFACE_ACTOR_WAYLAND (surface_actor));
+-  GNode *root_node = surface->subsurface_branch_node;
++  GNode *root_node = surface->output.subsurface_branch_node;
+   SurfaceTreeTraverseData traverse_data;
+ 
+   traverse_data = (SurfaceTreeTraverseData) {
+diff --git a/src/meson.build b/src/meson.build
+index 284bdf522..6b3e14a97 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -607,6 +607,8 @@ if have_wayland
+     'wayland/meta-wayland-text-input-legacy.h',
+     'wayland/meta-wayland-touch.c',
+     'wayland/meta-wayland-touch.h',
++    'wayland/meta-wayland-transaction.c',
++    'wayland/meta-wayland-transaction.h',
+     'wayland/meta-wayland-types.h',
+     'wayland/meta-wayland-versions.h',
+     'wayland/meta-wayland-viewporter.c',
+diff --git a/src/wayland/meta-wayland-actor-surface.c b/src/wayland/meta-wayland-actor-surface.c
+index 797795f86..0903687f6 100644
+--- a/src/wayland/meta-wayland-actor-surface.c
++++ b/src/wayland/meta-wayland-actor-surface.c
+@@ -273,7 +273,7 @@ meta_wayland_actor_surface_real_sync_actor_state (MetaWaylandActorSurface *actor
+ 
+   meta_shaped_texture_ensure_size_valid (stex);
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface_surface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface_surface)
+     {
+       MetaWaylandActorSurface *actor_surface;
+ 
+@@ -432,7 +432,7 @@ meta_wayland_actor_surface_reset_actor (MetaWaylandActorSurface *actor_surface)
+     meta_wayland_surface_role_get_surface (META_WAYLAND_SURFACE_ROLE (actor_surface));
+   MetaWaylandSurface *subsurface_surface;
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface_surface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface_surface)
+     {
+       MetaWaylandActorSurface *actor_surface;
+ 
+diff --git a/src/wayland/meta-wayland-buffer.c b/src/wayland/meta-wayland-buffer.c
+index f0431af3c..70af52626 100644
+--- a/src/wayland/meta-wayland-buffer.c
++++ b/src/wayland/meta-wayland-buffer.c
+@@ -175,6 +175,7 @@ meta_wayland_buffer_realize (MetaWaylandBuffer *buffer)
+                                      NULL))
+     {
+       buffer->type = META_WAYLAND_BUFFER_TYPE_EGL_IMAGE;
++      buffer->dma_buf.dma_buf = meta_wayland_dma_buf_fds_for_wayland_buffer (buffer);
+       return TRUE;
+     }
+ 
+diff --git a/src/wayland/meta-wayland-client.c b/src/wayland/meta-wayland-client.c
+index dfae1eda6..5fe8e247f 100644
+--- a/src/wayland/meta-wayland-client.c
++++ b/src/wayland/meta-wayland-client.c
+@@ -289,6 +289,9 @@ meta_wayland_client_owns_window (MetaWaylandClient *client,
+   if (surface == NULL)
+     return FALSE;
+ 
++  if (surface->resource == NULL)
++    return FALSE;
++
+   return wl_resource_get_client (surface->resource) == client->wayland_client;
+ }
+ 
+diff --git a/src/wayland/meta-wayland-data-device.c b/src/wayland/meta-wayland-data-device.c
+index 2f3c154a1..f8040e899 100644
+--- a/src/wayland/meta-wayland-data-device.c
++++ b/src/wayland/meta-wayland-data-device.c
+@@ -265,7 +265,8 @@ meta_wayland_drag_grab_set_focus (MetaWaylandDragGrab *drag_grab,
+   else if (source)
+     meta_wayland_data_source_target (source, NULL);
+ 
+-  if (!surface)
++  if (!surface ||
++      !surface->resource)
+     return;
+ 
+   if (!source &&
+diff --git a/src/wayland/meta-wayland-dma-buf.c b/src/wayland/meta-wayland-dma-buf.c
+index 0d37a12a9..a4cd25fa7 100644
+--- a/src/wayland/meta-wayland-dma-buf.c
++++ b/src/wayland/meta-wayland-dma-buf.c
+@@ -417,6 +417,56 @@ static const struct wl_buffer_interface dma_buf_buffer_impl =
+   buffer_destroy,
+ };
+ 
++/**
++ * meta_wayland_dma_buf_fds_for_wayland_buffer:
++ * @buffer: A #MetaWaylandBuffer object
++ *
++ * Creates an associated #MetaWaylandDmaBufBuffer for the wayland buffer, which
++ * contains just the dma-buf file descriptors.
++ *
++ * Returns: The new #MetaWaylandDmaBufBuffer (or
++ * %NULL if it couldn't be created)
++ */
++MetaWaylandDmaBufBuffer *
++meta_wayland_dma_buf_fds_for_wayland_buffer (MetaWaylandBuffer *buffer)
++{
++#ifdef HAVE_NATIVE_BACKEND
++  MetaBackend *backend = meta_get_backend ();
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaRendererNative *renderer_native = META_RENDERER_NATIVE (renderer);
++  MetaGpuKms *gpu_kms;
++  struct gbm_device *gbm_device;
++  struct gbm_bo *gbm_bo;
++  MetaWaylandDmaBufBuffer *dma_buf;
++  uint32_t i, n_planes;
++
++  gpu_kms = meta_renderer_native_get_primary_gpu (renderer_native);
++  if (!gpu_kms)
++    return NULL;
++
++  gbm_device = meta_gbm_device_from_gpu (gpu_kms);
++
++  gbm_bo = gbm_bo_import (gbm_device,
++                          GBM_BO_IMPORT_WL_BUFFER, buffer->resource,
++                          GBM_BO_USE_RENDERING);
++  if (!gbm_bo)
++    return NULL;
++
++  dma_buf = g_object_new (META_TYPE_WAYLAND_DMA_BUF_BUFFER, NULL);
++
++  n_planes = gbm_bo_get_plane_count (gbm_bo);
++  for (i = 0; i < n_planes; i++)
++    dma_buf->fds[i] = gbm_bo_get_fd_for_plane (gbm_bo, i);
++  while (i < META_WAYLAND_DMA_BUF_MAX_FDS)
++    dma_buf->fds[i++] = -1;
++
++  gbm_bo_destroy (gbm_bo);
++  return dma_buf;
++#else
++  return NULL;
++#endif
++}
++
+ /**
+  * meta_wayland_dma_buf_from_buffer:
+  * @buffer: A #MetaWaylandBuffer object
+@@ -438,7 +488,160 @@ meta_wayland_dma_buf_from_buffer (MetaWaylandBuffer *buffer)
+                                &dma_buf_buffer_impl))
+     return wl_resource_get_user_data (buffer->resource);
+ 
+-  return NULL;
++  return buffer->dma_buf.dma_buf;
++}
++
++struct _MetaWaylandDmaBufSource
++{
++  GSource base;
++
++  void (*dispatch) (MetaWaylandBuffer *buffer,
++                    void              *user_data);
++  MetaWaylandBuffer *buffer;
++  void *user_data;
++
++  void *fd_tags[META_WAYLAND_DMA_BUF_MAX_FDS];
++};
++
++static gboolean
++meta_wayland_dma_buf_fd_readable (int fd)
++{
++  GPollFD poll_fd;
++
++  poll_fd.fd = fd;
++  poll_fd.events = G_IO_IN;
++  poll_fd.revents = 0;
++
++  if (!g_poll (&poll_fd, 1, 0))
++    return FALSE;
++
++  return (poll_fd.revents & (G_IO_IN | G_IO_NVAL)) != 0;
++}
++
++static gboolean
++meta_wayland_dma_buf_source_check (GSource *base)
++{
++  struct _MetaWaylandDmaBufSource *source;
++  MetaWaylandDmaBufBuffer *dma_buf;
++  gboolean ready;
++  uint32_t i;
++
++  source = (struct _MetaWaylandDmaBufSource *)base;
++  dma_buf = source->buffer->dma_buf.dma_buf;
++  ready = TRUE;
++
++  for (i = 0; i < META_WAYLAND_DMA_BUF_MAX_FDS; i++)
++    {
++      void *fd_tag = source->fd_tags[i];
++
++      if (!fd_tag)
++        continue;
++
++      if (!meta_wayland_dma_buf_fd_readable (dma_buf->fds[i]))
++        {
++          ready = FALSE;
++          continue;
++        }
++
++      g_source_remove_unix_fd (&source->base, fd_tag);
++      source->fd_tags[i] = NULL;
++    }
++
++  return ready;
++}
++
++static gboolean
++meta_wayland_dma_buf_source_dispatch (GSource    *base,
++                                      GSourceFunc callback,
++                                      void       *user_data)
++{
++  struct _MetaWaylandDmaBufSource *source;
++
++  source = (struct _MetaWaylandDmaBufSource *)base;
++  source->dispatch (source->buffer, source->user_data);
++
++  return G_SOURCE_REMOVE;
++}
++
++static void
++meta_wayland_dma_buf_source_finalize (GSource *base)
++{
++  struct _MetaWaylandDmaBufSource *source;
++  uint32_t i;
++
++  source = (struct _MetaWaylandDmaBufSource *)base;
++
++  for (i = 0; i < META_WAYLAND_DMA_BUF_MAX_FDS; i++)
++    {
++      void *fd_tag = source->fd_tags[i];
++
++      if (fd_tag)
++        {
++          g_source_remove_unix_fd(&source->base, fd_tag);
++          source->fd_tags[i] = NULL;
++        }
++    }
++
++  g_clear_object (&source->buffer);
++}
++
++static GSourceFuncs meta_wayland_dma_buf_source_funcs =
++  {
++    .check = meta_wayland_dma_buf_source_check,
++    .dispatch = meta_wayland_dma_buf_source_dispatch,
++    .finalize = meta_wayland_dma_buf_source_finalize
++  };
++
++/**
++ * meta_wayland_dma_buf_get_source:
++ * @buffer: A #MetaWaylandBuffer object
++ * @dispatch: Callback
++ * @user_data: User data for the callback
++ *
++ * Creates a GSource which will call the specified dispatch callback when all
++ * dma-buf file descriptors for the buffer have become readable.
++ *
++ * Returns: The new GSource (or
++ * %NULL if there are no dma-buf file descriptors, or they were all readable
++ * already)
++ */
++GSource *
++meta_wayland_dma_buf_get_source (MetaWaylandBuffer *buffer,
++                                 void (*dispatch) (MetaWaylandBuffer *buffer,
++                                                   void              *user_data),
++                                 void *user_data)
++{
++  MetaWaylandDmaBufBuffer *dma_buf;
++  struct _MetaWaylandDmaBufSource *source = NULL;
++  uint32_t i;
++
++  dma_buf = buffer->dma_buf.dma_buf;
++  if (!dma_buf)
++    return NULL;
++
++  for (i = 0; i < META_WAYLAND_DMA_BUF_MAX_FDS; i++)
++    {
++      int fd = dma_buf->fds[i];
++
++      if (fd < 0)
++        break;
++
++      if (meta_wayland_dma_buf_fd_readable (fd))
++        continue;
++
++      if (!source)
++        {
++          source = (struct _MetaWaylandDmaBufSource *)
++            g_source_new (&meta_wayland_dma_buf_source_funcs, sizeof (*source));
++          source->buffer = g_object_ref (buffer);
++          source->dispatch = dispatch;
++          source->user_data = user_data;
++        }
++
++      source->fd_tags[i] = g_source_add_unix_fd (&source->base, fd, G_IO_IN);
++    }
++
++  return &source->base;
+ }
+ 
+ static void
+diff --git a/src/wayland/meta-wayland-dma-buf.h b/src/wayland/meta-wayland-dma-buf.h
+index cdc65aeb5..fc5ec41d2 100644
+--- a/src/wayland/meta-wayland-dma-buf.h
++++ b/src/wayland/meta-wayland-dma-buf.h
+@@ -46,9 +46,18 @@ meta_wayland_dma_buf_buffer_attach (MetaWaylandBuffer  *buffer,
+                                     CoglTexture       **texture,
+                                     GError            **error);
+ 
++MetaWaylandDmaBufBuffer *
++meta_wayland_dma_buf_fds_for_wayland_buffer (MetaWaylandBuffer *buffer);
++
+ MetaWaylandDmaBufBuffer *
+ meta_wayland_dma_buf_from_buffer (MetaWaylandBuffer *buffer);
+ 
++GSource *
++meta_wayland_dma_buf_get_source (MetaWaylandBuffer *buffer,
++                                 void (*dispatch) (MetaWaylandBuffer *buffer,
++                                                   void              *user_data),
++                                 void *user_data);
++
+ CoglScanout *
+ meta_wayland_dma_buf_try_acquire_scanout (MetaWaylandDmaBufBuffer *dma_buf,
+                                           CoglOnscreen            *onscreen);
+diff --git a/src/wayland/meta-wayland-legacy-xdg-shell.c b/src/wayland/meta-wayland-legacy-xdg-shell.c
+index 6dc8cc402..2e20003b0 100644
+--- a/src/wayland/meta-wayland-legacy-xdg-shell.c
++++ b/src/wayland/meta-wayland-legacy-xdg-shell.c
+@@ -751,7 +751,7 @@ meta_wayland_zxdg_toplevel_v6_post_apply_state (MetaWaylandSurfaceRole  *surface
+ 
+           meta_window_recalc_features (window);
+         }
+-      else
++      else if (surface->resource)
+         {
+           wl_resource_post_error (surface->resource,
+                                   ZXDG_SHELL_V6_ERROR_INVALID_SURFACE_STATE,
+@@ -1390,17 +1390,23 @@ meta_wayland_zxdg_surface_v6_apply_state (MetaWaylandSurfaceRole  *surface_role,
+   if (!surface->buffer_ref->buffer && priv->first_buffer_attached)
+     {
+       /* XDG surfaces can't commit NULL buffers */
+-      wl_resource_post_error (surface->resource,
+-                              WL_DISPLAY_ERROR_INVALID_OBJECT,
+-                              "Cannot commit a NULL buffer to an xdg_surface");
++      if (surface->resource)
++        {
++          wl_resource_post_error (surface->resource,
++                                  WL_DISPLAY_ERROR_INVALID_OBJECT,
++                                  "Cannot commit a NULL buffer to an xdg_surface");
++        }
+       return;
+     }
+ 
+   if (surface->buffer_ref->buffer && !priv->configure_sent)
+     {
+-      wl_resource_post_error (surface->resource,
+-                              ZXDG_SURFACE_V6_ERROR_UNCONFIGURED_BUFFER,
+-                              "buffer committed to unconfigured xdg_surface");
++      if (surface->resource)
++        {
++          wl_resource_post_error (surface->resource,
++                                  ZXDG_SURFACE_V6_ERROR_UNCONFIGURED_BUFFER,
++                                  "buffer committed to unconfigured xdg_surface");
++        }
+       return;
+     }
+ 
+@@ -1464,10 +1470,13 @@ meta_wayland_zxdg_surface_v6_assigned (MetaWaylandSurfaceRole *surface_role)
+ 
+   if (surface->buffer_ref->buffer)
+     {
+-      wl_resource_post_error (xdg_shell_resource,
+-                              ZXDG_SHELL_V6_ERROR_INVALID_SURFACE_STATE,
+-                              "wl_surface@%d already has a buffer committed",
+-                              wl_resource_get_id (surface->resource));
++      if (surface->resource)
++        {
++          wl_resource_post_error (xdg_shell_resource,
++                                  ZXDG_SHELL_V6_ERROR_INVALID_SURFACE_STATE,
++                                  "wl_surface@%d already has a buffer committed",
++                                  wl_resource_get_id (surface->resource));
++        }
+       return;
+     }
+ 
+diff --git a/src/wayland/meta-wayland-pointer-constraints.c b/src/wayland/meta-wayland-pointer-constraints.c
+index 965b95dda..985d5115b 100644
+--- a/src/wayland/meta-wayland-pointer-constraints.c
++++ b/src/wayland/meta-wayland-pointer-constraints.c
+@@ -191,7 +191,7 @@ surface_constraint_data_new (MetaWaylandSurface *surface)
+                           G_CALLBACK (window_associated),
+                           data);
+     }
+-  else
++  else if (surface->resource)
+     {
+       /* TODO: Support constraints on non-toplevel windows, such as subsurfaces.
+        */
+@@ -618,7 +618,8 @@ meta_wayland_pointer_constraint_calculate_effective_region (MetaWaylandPointerCo
+       MetaFrame *frame = window->frame;
+       int actual_width, actual_height;
+ 
+-      g_assert (meta_xwayland_is_xwayland_surface (constraint->surface));
++      if (constraint->surface->resource)
++        g_assert (meta_xwayland_is_xwayland_surface (constraint->surface));
+ 
+       actual_width = window->buffer_rect.width - (frame->child_x +
+                                                   frame->right_width);
+@@ -850,6 +851,9 @@ init_pointer_constraint (struct wl_resource                      *resource,
+   struct wl_resource *cr;
+   MetaWaylandPointerConstraint *constraint;
+ 
++  if (!surface->resource)
++    return;
++
+   if (get_pointer_constraint_for_seat (surface, seat))
+     {
+       wl_resource_post_error (resource,
+diff --git a/src/wayland/meta-wayland-pointer-gesture-pinch.c b/src/wayland/meta-wayland-pointer-gesture-pinch.c
+index f7b37ff27..3d04823b0 100644
+--- a/src/wayland/meta-wayland-pointer-gesture-pinch.c
++++ b/src/wayland/meta-wayland-pointer-gesture-pinch.c
+@@ -112,7 +112,8 @@ meta_wayland_pointer_gesture_pinch_handle_event (MetaWaylandPointer *pointer,
+   if (event->type != CLUTTER_TOUCHPAD_PINCH)
+     return FALSE;
+ 
+-  if (!pointer->focus_client)
++  if (!pointer->focus_client ||
++      !pointer->focus_surface->resource)
+     return FALSE;
+ 
+   switch (event->touchpad_pinch.phase)
+diff --git a/src/wayland/meta-wayland-pointer-gesture-swipe.c b/src/wayland/meta-wayland-pointer-gesture-swipe.c
+index 043e3eb23..90cff9f95 100644
+--- a/src/wayland/meta-wayland-pointer-gesture-swipe.c
++++ b/src/wayland/meta-wayland-pointer-gesture-swipe.c
+@@ -108,7 +108,8 @@ meta_wayland_pointer_gesture_swipe_handle_event (MetaWaylandPointer *pointer,
+   if (event->type != CLUTTER_TOUCHPAD_SWIPE)
+     return FALSE;
+ 
+-  if (!pointer->focus_client)
++  if (!pointer->focus_client ||
++      !pointer->focus_surface->resource)
+     return FALSE;
+ 
+   switch (event->touchpad_swipe.phase)
+diff --git a/src/wayland/meta-wayland-pointer.c b/src/wayland/meta-wayland-pointer.c
+index 3132abfd2..96a90c7d7 100644
+--- a/src/wayland/meta-wayland-pointer.c
++++ b/src/wayland/meta-wayland-pointer.c
+@@ -178,6 +178,7 @@ meta_wayland_pointer_ensure_pointer_client (MetaWaylandPointer *pointer,
+ 
+   if (!pointer->focus_client &&
+       pointer->focus_surface &&
++      pointer->focus_surface->resource &&
+       wl_resource_get_client (pointer->focus_surface->resource) == client)
+     pointer->focus_client = pointer_client;
+ 
+@@ -878,6 +879,16 @@ focus_surface_destroyed (MetaWaylandSurface *surface,
+   meta_wayland_pointer_set_focus (pointer, NULL);
+ }
+ 
++static void
++focus_resource_destroyed (struct wl_listener *listener,
++                          void               *data)
++{
++  MetaWaylandPointer *pointer =
++    wl_container_of (listener, pointer, focus_resource_destroy_listener);
++
++  pointer->focus_client = NULL;
++}
++
+ void
+ meta_wayland_pointer_set_focus (MetaWaylandPointer *pointer,
+                                 MetaWaylandSurface *surface)
+@@ -911,13 +922,14 @@ meta_wayland_pointer_set_focus (MetaWaylandPointer *pointer,
+ 
+       g_clear_signal_handler (&pointer->focus_surface_destroyed_handler_id,
+                               pointer->focus_surface);
++      wl_list_remove (&pointer->focus_resource_destroy_listener.link);
+       pointer->focus_surface = NULL;
+     }
+ 
+   if (surface != NULL)
+     {
+       ClutterStage *stage = CLUTTER_STAGE (meta_backend_get_stage (backend));
+-      struct wl_client *client = wl_resource_get_client (surface->resource);
++      struct wl_client *client;
+       graphene_point_t pos;
+       MetaWindow *focus_window;
+ 
+@@ -937,15 +949,22 @@ meta_wayland_pointer_set_focus (MetaWaylandPointer *pointer,
+                                   clutter_get_current_event_time (),
+                                   pos.x, pos.y);
+ 
+-      pointer->focus_client =
+-        meta_wayland_pointer_get_pointer_client (pointer, client);
+-      if (pointer->focus_client)
++      if (surface->resource)
+         {
+-          pointer->focus_serial =
+-            meta_wayland_input_device_next_serial (input_device);
+-          meta_wayland_pointer_broadcast_enter (pointer,
+-                                                pointer->focus_serial,
+-                                                pointer->focus_surface);
++          client = wl_resource_get_client (surface->resource);
++          pointer->focus_client =
++            meta_wayland_pointer_get_pointer_client (pointer, client);
++          if (pointer->focus_client)
++            {
++              pointer->focus_serial =
++                meta_wayland_input_device_next_serial (input_device);
++              meta_wayland_pointer_broadcast_enter (pointer, pointer->focus_serial,
++                                                    pointer->focus_surface);
++            }
++
++          pointer->focus_resource_destroy_listener.notify = focus_resource_destroyed;
++          wl_resource_add_destroy_listener (surface->resource,
++                                            &pointer->focus_resource_destroy_listener);
+         }
+     }
+ 
+@@ -1124,7 +1143,8 @@ pointer_set_cursor (struct wl_client *client,
+ 
+   if (pointer->focus_surface == NULL)
+     return;
+-  if (wl_resource_get_client (pointer->focus_surface->resource) != client)
++  if (!pointer->focus_surface->resource ||
++      wl_resource_get_client (pointer->focus_surface->resource) != client)
+     return;
+   if (pointer->focus_serial - serial > G_MAXUINT32 / 2)
+     return;
+@@ -1210,7 +1230,7 @@ pointer_can_grab_surface (MetaWaylandPointer *pointer,
+   if (pointer->focus_surface == surface)
+     return TRUE;
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface)
+     {
+       if (pointer_can_grab_surface (pointer, subsurface))
+         return TRUE;
+diff --git a/src/wayland/meta-wayland-pointer.h b/src/wayland/meta-wayland-pointer.h
+index 5eda5276f..dce252584 100644
+--- a/src/wayland/meta-wayland-pointer.h
++++ b/src/wayland/meta-wayland-pointer.h
+@@ -65,6 +65,8 @@ struct _MetaWaylandPointer
+ {
+   MetaWaylandInputDevice parent;
+ 
++  struct wl_listener focus_resource_destroy_listener;
++
+   MetaWaylandPointerClient *focus_client;
+   GHashTable *pointer_clients;
+ 
+diff --git a/src/wayland/meta-wayland-popup.c b/src/wayland/meta-wayland-popup.c
+index 995d5f967..23ece9b6e 100644
+--- a/src/wayland/meta-wayland-popup.c
++++ b/src/wayland/meta-wayland-popup.c
+@@ -116,6 +116,7 @@ popup_grab_focus (MetaWaylandPointerGrab *grab,
+   /* Popup grabs are in owner-events mode (ie, events for the same client
+      are reported as normal) */
+   if (surface &&
++      surface->resource &&
+       wl_resource_get_client (surface->resource) == popup_grab->grab_client)
+     meta_wayland_pointer_set_focus (grab->pointer, surface);
+   else if (pointer->button_count == 0)
+diff --git a/src/wayland/meta-wayland-private.h b/src/wayland/meta-wayland-private.h
+index 3306c192c..39ba256b7 100644
+--- a/src/wayland/meta-wayland-private.h
++++ b/src/wayland/meta-wayland-private.h
+@@ -97,6 +97,12 @@ struct _MetaWaylandCompositor
+   GHashTable *scheduled_surface_associations;
+ 
+   MetaWaylandPresentationTime presentation_time;
++
++  /*
++   * Queue of transactions which have been committed but not applied yet, in the
++   * order they were committed.
++   */
++  GQueue transactions;
+ };
+ 
+ #define META_TYPE_WAYLAND_COMPOSITOR (meta_wayland_compositor_get_type ())
+diff --git a/src/wayland/meta-wayland-shell-surface.c b/src/wayland/meta-wayland-shell-surface.c
+index 5e052e000..89f5d77a3 100644
+--- a/src/wayland/meta-wayland-shell-surface.c
++++ b/src/wayland/meta-wayland-shell-surface.c
+@@ -59,7 +59,7 @@ meta_wayland_shell_surface_calculate_geometry (MetaWaylandShellSurface *shell_su
+     .height = meta_wayland_surface_get_height (surface),
+   };
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface_surface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface_surface)
+     {
+       MetaWaylandSubsurface *subsurface;
+ 
+diff --git a/src/wayland/meta-wayland-subsurface.c b/src/wayland/meta-wayland-subsurface.c
+index d7f56b66e..d2fbf1afb 100644
+--- a/src/wayland/meta-wayland-subsurface.c
++++ b/src/wayland/meta-wayland-subsurface.c
+@@ -28,6 +28,7 @@
+ #include "wayland/meta-wayland-actor-surface.h"
+ #include "wayland/meta-wayland-buffer.h"
+ #include "wayland/meta-wayland-surface.h"
++#include "wayland/meta-wayland-transaction.h"
+ #include "wayland/meta-window-wayland.h"
+ 
+ struct _MetaWaylandSubsurface
+@@ -49,7 +50,7 @@ transform_subsurface_position (MetaWaylandSurface *surface,
+       *x += surface->sub.x;
+       *y += surface->sub.y;
+ 
+-      surface = surface->sub.parent;
++      surface = surface->output.parent;
+     }
+   while (surface);
+ }
+@@ -59,8 +60,8 @@ should_show (MetaWaylandSurface *surface)
+ {
+   if (!surface->buffer_ref->buffer)
+     return FALSE;
+-  else if (surface->sub.parent)
+-    return should_show (surface->sub.parent);
++  else if (surface->output.parent)
++    return should_show (surface->output.parent);
+   else
+     return TRUE;
+ }
+@@ -95,7 +96,7 @@ static gboolean
+ is_child (MetaWaylandSurface *surface,
+           MetaWaylandSurface *sibling)
+ {
+-  if (surface->sub.parent == sibling)
++  if (surface->protocol.parent == sibling)
+     return TRUE;
+   else
+     return FALSE;
+@@ -105,40 +106,12 @@ static gboolean
+ is_sibling (MetaWaylandSurface *surface,
+             MetaWaylandSurface *sibling)
+ {
+-  if (surface->sub.parent == sibling->sub.parent)
++  if (surface->protocol.parent == sibling->protocol.parent)
+     return TRUE;
+   else
+     return FALSE;
+ }
+ 
+-static gboolean
+-is_surface_effectively_synchronized (MetaWaylandSurface *surface)
+-{
+-  return meta_wayland_surface_should_cache_state (surface);
+-}
+-
+-void
+-meta_wayland_subsurface_parent_state_applied (MetaWaylandSubsurface *subsurface)
+-{
+-  MetaWaylandSurfaceRole *surface_role = META_WAYLAND_SURFACE_ROLE (subsurface);
+-  MetaWaylandActorSurface *actor_surface =
+-    META_WAYLAND_ACTOR_SURFACE (subsurface);
+-  MetaWaylandSurface *surface =
+-    meta_wayland_surface_role_get_surface (surface_role);
+-
+-  if (surface->sub.pending_pos)
+-    {
+-      surface->sub.x = surface->sub.pending_x;
+-      surface->sub.y = surface->sub.pending_y;
+-      surface->sub.pending_pos = FALSE;
+-    }
+-
+-  if (is_surface_effectively_synchronized (surface))
+-    meta_wayland_surface_apply_cached_state (surface);
+-
+-  meta_wayland_actor_surface_sync_actor_state (actor_surface);
+-}
+-
+ void
+ meta_wayland_subsurface_union_geometry (MetaWaylandSubsurface *subsurface,
+                                         int                    parent_x,
+@@ -161,7 +134,7 @@ meta_wayland_subsurface_union_geometry (MetaWaylandSubsurface *subsurface,
+   if (surface->buffer_ref->buffer)
+     meta_rectangle_union (out_geometry, &geometry, out_geometry);
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface_surface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface_surface)
+     {
+       MetaWaylandSubsurface *subsurface;
+ 
+@@ -191,7 +164,7 @@ meta_wayland_subsurface_get_toplevel (MetaWaylandSurfaceRole *surface_role)
+ {
+   MetaWaylandSurface *surface =
+     meta_wayland_surface_role_get_surface (surface_role);
+-  MetaWaylandSurface *parent = surface->sub.parent;
++  MetaWaylandSurface *parent = surface->output.parent;
+ 
+   if (parent)
+     return meta_wayland_surface_get_toplevel (parent);
+@@ -200,7 +173,7 @@ meta_wayland_subsurface_get_toplevel (MetaWaylandSurfaceRole *surface_role)
+ }
+ 
+ static gboolean
+-meta_wayland_subsurface_should_cache_state (MetaWaylandSurfaceRole *surface_role)
++meta_wayland_subsurface_is_synchronized (MetaWaylandSurfaceRole *surface_role)
+ {
+   MetaWaylandSurface *surface =
+     meta_wayland_surface_role_get_surface (surface_role);
+@@ -209,9 +182,9 @@ meta_wayland_subsurface_should_cache_state (MetaWaylandSurfaceRole *surface_role
+   if (surface->sub.synchronous)
+     return TRUE;
+ 
+-  parent = surface->sub.parent;
++  parent = surface->protocol.parent;
+   if (parent)
+-    return meta_wayland_surface_should_cache_state (parent);
++    return meta_wayland_surface_is_synchronized (parent);
+ 
+   return TRUE;
+ }
+@@ -221,7 +194,7 @@ meta_wayland_subsurface_notify_subsurface_state_changed (MetaWaylandSurfaceRole
+ {
+   MetaWaylandSurface *surface =
+     meta_wayland_surface_role_get_surface (surface_role);
+-  MetaWaylandSurface *parent = surface->sub.parent;
++  MetaWaylandSurface *parent = surface->output.parent;
+ 
+   if (parent)
+     return meta_wayland_surface_notify_subsurface_state_changed (parent);
+@@ -234,13 +207,13 @@ meta_wayland_subsurface_get_geometry_scale (MetaWaylandActorSurface *actor_surfa
+     META_WAYLAND_SURFACE_ROLE (actor_surface);
+   MetaWaylandSurface *surface =
+     meta_wayland_surface_role_get_surface (surface_role);
+-  MetaWaylandSurface *parent = surface->sub.parent;
++  MetaWaylandSurface *parent = surface->output.parent;
+ 
+   if (parent)
+     {
+       MetaWaylandActorSurface *parent_actor;
+ 
+-      parent_actor = META_WAYLAND_ACTOR_SURFACE (surface->sub.parent->role);
++      parent_actor = META_WAYLAND_ACTOR_SURFACE (surface->output.parent->role);
+       return meta_wayland_actor_surface_get_geometry_scale (parent_actor);
+     }
+   else
+@@ -282,7 +255,7 @@ meta_wayland_subsurface_class_init (MetaWaylandSubsurfaceClass *klass)
+ 
+   surface_role_class->assigned = meta_wayland_subsurface_assigned;
+   surface_role_class->get_toplevel = meta_wayland_subsurface_get_toplevel;
+-  surface_role_class->should_cache_state = meta_wayland_subsurface_should_cache_state;
++  surface_role_class->is_synchronized = meta_wayland_subsurface_is_synchronized;
+   surface_role_class->notify_subsurface_state_changed =
+     meta_wayland_subsurface_notify_subsurface_state_changed;
+ 
+@@ -292,37 +265,6 @@ meta_wayland_subsurface_class_init (MetaWaylandSubsurfaceClass *klass)
+     meta_wayland_subsurface_sync_actor_state;
+ }
+ 
+-static void
+-unparent_actor (MetaWaylandSurface *surface)
+-{
+-  ClutterActor *actor;
+-  ClutterActor *parent_actor;
+-
+-  actor = CLUTTER_ACTOR (meta_wayland_surface_get_actor (surface));
+-  if (!actor)
+-    return;
+-
+-  parent_actor = clutter_actor_get_parent (actor);
+-  clutter_actor_remove_child (parent_actor, actor);
+-}
+-
+-static void
+-wl_subsurface_destructor (struct wl_resource *resource)
+-{
+-  MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
+-
+-  g_node_unlink (surface->subsurface_branch_node);
+-  unparent_actor (surface);
+-
+-  if (surface->sub.parent)
+-    {
+-      wl_list_remove (&surface->sub.parent_destroy_listener.link);
+-      surface->sub.parent = NULL;
+-    }
+-
+-  surface->wl_subsurface = NULL;
+-}
+-
+ static void
+ wl_subsurface_destroy (struct wl_client   *client,
+                        struct wl_resource *resource)
+@@ -337,10 +279,10 @@ wl_subsurface_set_position (struct wl_client   *client,
+                             int32_t             y)
+ {
+   MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
++  MetaWaylandTransaction *transaction;
+ 
+-  surface->sub.pending_x = x;
+-  surface->sub.pending_y = y;
+-  surface->sub.pending_pos = TRUE;
++  transaction = meta_wayland_surface_ensure_transaction (surface);
++  meta_wayland_transaction_add_subsurface_position (transaction, surface, x, y);
+ }
+ 
+ static gboolean
+@@ -361,6 +303,7 @@ subsurface_handle_pending_subsurface_destroyed (struct wl_listener *listener,
+   MetaWaylandSubsurfacePlacementOp *op =
+     wl_container_of (listener, op, subsurface_destroy_listener);
+ 
++  wl_list_remove (&op->subsurface_destroy_listener.link);
+   op->surface = NULL;
+ }
+ 
+@@ -371,16 +314,21 @@ subsurface_handle_pending_sibling_destroyed (struct wl_listener *listener,
+   MetaWaylandSubsurfacePlacementOp *op =
+     wl_container_of (listener, op, sibling_destroy_listener);
+ 
++  wl_list_remove (&op->sibling_destroy_listener.link);
+   op->sibling = NULL;
+ }
+ 
+ void
+ meta_wayland_subsurface_placement_op_free (MetaWaylandSubsurfacePlacementOp *op)
+ {
+-  if (op->surface)
+-    wl_list_remove (&op->subsurface_destroy_listener.link);
+-  if (op->sibling)
+-    wl_list_remove (&op->sibling_destroy_listener.link);
++  if (op->parent)
++    {
++      if (op->surface)
++        wl_list_remove(&op->subsurface_destroy_listener.link);
++      if (op->sibling)
++        wl_list_remove(&op->sibling_destroy_listener.link);
++    }
++
+   g_free (op);
+ }
+ 
+@@ -389,13 +337,30 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
+                             MetaWaylandSurface             *sibling,
+                             MetaWaylandSubsurfacePlacement  placement)
+ {
+-  MetaWaylandSurface *parent = surface->sub.parent;
++  MetaWaylandSurface *parent = surface->protocol.parent;
+   MetaWaylandSubsurfacePlacementOp *op =
+     g_new0 (MetaWaylandSubsurfacePlacementOp, 1);
++  GNode *sibling_node;
+ 
+   op->placement = placement;
+   op->surface = surface;
+   op->sibling = sibling;
++
++  parent->pending_state->subsurface_placement_ops =
++    g_slist_append (parent->pending_state->subsurface_placement_ops, op);
++
++  g_node_unlink (surface->protocol.subsurface_branch_node);
++
++  if (!sibling)
++    {
++      op->parent = NULL;
++      /* Keep child surface alive until it's unlinked from the parent */
++      g_object_ref (surface);
++      return;
++    }
++
++  op->parent = parent;
++
+   op->subsurface_destroy_listener.notify =
+     subsurface_handle_pending_subsurface_destroyed;
+   op->sibling_destroy_listener.notify =
+@@ -405,8 +370,24 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
+   wl_resource_add_destroy_listener (sibling->resource,
+                                     &op->sibling_destroy_listener);
+ 
+-  parent->pending_state->subsurface_placement_ops =
+-    g_slist_append (parent->pending_state->subsurface_placement_ops, op);
++  if (sibling == parent)
++    sibling_node = parent->protocol.subsurface_leaf_node;
++  else
++    sibling_node = sibling->protocol.subsurface_branch_node;
++
++  switch (placement)
++    {
++    case META_WAYLAND_SUBSURFACE_PLACEMENT_ABOVE:
++      g_node_insert_after (parent->protocol.subsurface_branch_node,
++                           sibling_node,
++                           surface->protocol.subsurface_branch_node);
++      break;
++    case META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW:
++      g_node_insert_before (parent->protocol.subsurface_branch_node,
++                            sibling_node,
++                            surface->protocol.subsurface_branch_node);
++      break;
++    }
+ }
+ 
+ static void
+@@ -453,6 +434,24 @@ wl_subsurface_place_below (struct wl_client   *client,
+                               META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW);
+ }
+ 
++static void
++wl_subsurface_destructor (struct wl_resource *resource)
++{
++  MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
++
++  g_node_unlink (surface->protocol.subsurface_branch_node);
++
++  if (surface->protocol.parent)
++    {
++      wl_list_remove (&surface->sub.parent_destroy_listener.link);
++      queue_subsurface_placement (surface, NULL,
++                                  META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW);
++      surface->protocol.parent = NULL;
++    }
++
++  surface->wl_subsurface = NULL;
++}
++
+ static void
+ wl_subsurface_set_sync (struct wl_client   *client,
+                         struct wl_resource *resource)
+@@ -462,19 +461,37 @@ wl_subsurface_set_sync (struct wl_client   *client,
+   surface->sub.synchronous = TRUE;
+ }
+ 
++static void
++meta_wayland_subsurface_parent_desynced (MetaWaylandSurface *surface)
++{
++  MetaWaylandSurface *subsurface_surface;
++
++  if (surface->sub.synchronous)
++    return;
++
++  if (surface->sub.transaction)
++    {
++      meta_wayland_transaction_commit (surface->sub.transaction);
++      surface->sub.transaction = NULL;
++    }
++
++  META_WAYLAND_SURFACE_FOREACH_PROTOCOL_SUBSURFACE (surface, subsurface_surface)
++    meta_wayland_subsurface_parent_desynced (subsurface_surface);
++}
++
+ static void
+ wl_subsurface_set_desync (struct wl_client   *client,
+                           struct wl_resource *resource)
+ {
+   MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
+-  gboolean was_effectively_synchronized;
+ 
+-  was_effectively_synchronized = is_surface_effectively_synchronized (surface);
++  if (!surface->sub.synchronous)
++    return;
++
+   surface->sub.synchronous = FALSE;
+ 
+-  if (was_effectively_synchronized &&
+-      !is_surface_effectively_synchronized (surface))
+-    meta_wayland_surface_apply_cached_state (surface);
++  if (!meta_wayland_surface_is_synchronized (surface))
++    meta_wayland_subsurface_parent_desynced (surface);
+ }
+ 
+ static const struct wl_subsurface_interface meta_wayland_wl_subsurface_interface = {
+@@ -501,7 +518,9 @@ surface_handle_parent_surface_destroyed (struct wl_listener *listener,
+                                                  surface,
+                                                  sub.parent_destroy_listener);
+ 
+-  surface->sub.parent = NULL;
++  queue_subsurface_placement (surface, NULL,
++                              META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW);
++  surface->protocol.parent = NULL;
+ }
+ 
+ static gboolean
+@@ -510,8 +529,8 @@ is_same_or_ancestor (MetaWaylandSurface *surface,
+ {
+   if (surface == other_surface)
+     return TRUE;
+-  if (other_surface->sub.parent)
+-    return is_same_or_ancestor (surface, other_surface->sub.parent);
++  if (other_surface->protocol.parent)
++    return is_same_or_ancestor (surface, other_surface->protocol.parent);
+   return FALSE;
+ }
+ 
+@@ -570,16 +589,14 @@ wl_subcompositor_get_subsurface (struct wl_client   *client,
+                                   wl_subsurface_destructor);
+ 
+   surface->sub.synchronous = TRUE;
+-  surface->sub.parent = parent;
++  surface->protocol.parent = parent;
+   surface->sub.parent_destroy_listener.notify =
+     surface_handle_parent_surface_destroyed;
+   wl_resource_add_destroy_listener (parent->resource,
+                                     &surface->sub.parent_destroy_listener);
+ 
+-  g_node_append (parent->subsurface_branch_node,
+-                 surface->subsurface_branch_node);
+-
+-  meta_wayland_surface_notify_subsurface_state_changed (parent);
++  queue_subsurface_placement (surface, parent,
++                              META_WAYLAND_SUBSURFACE_PLACEMENT_ABOVE);
+ }
+ 
+ static const struct wl_subcompositor_interface meta_wayland_subcompositor_interface = {
+diff --git a/src/wayland/meta-wayland-subsurface.h b/src/wayland/meta-wayland-subsurface.h
+index 45dbf8626..e209e824d 100644
+--- a/src/wayland/meta-wayland-subsurface.h
++++ b/src/wayland/meta-wayland-subsurface.h
+@@ -38,14 +38,13 @@ typedef enum
+ typedef struct
+ {
+   MetaWaylandSubsurfacePlacement placement;
++  MetaWaylandSurface *parent;
+   MetaWaylandSurface *surface;
+   MetaWaylandSurface *sibling;
+   struct wl_listener subsurface_destroy_listener;
+   struct wl_listener sibling_destroy_listener;
+ } MetaWaylandSubsurfacePlacementOp;
+ 
+-void meta_wayland_subsurface_parent_state_applied (MetaWaylandSubsurface *subsurface);
+-
+ void meta_wayland_subsurface_union_geometry (MetaWaylandSubsurface *subsurface,
+                                              int                    parent_x,
+                                              int                    parent_y,
+diff --git a/src/wayland/meta-wayland-surface.c b/src/wayland/meta-wayland-surface.c
+index 8dbf3a750..1225dc5c6 100644
+--- a/src/wayland/meta-wayland-surface.c
++++ b/src/wayland/meta-wayland-surface.c
+@@ -51,6 +51,7 @@
+ #include "wayland/meta-wayland-region.h"
+ #include "wayland/meta-wayland-seat.h"
+ #include "wayland/meta-wayland-subsurface.h"
++#include "wayland/meta-wayland-transaction.h"
+ #include "wayland/meta-wayland-viewporter.h"
+ #include "wayland/meta-wayland-wl-shell.h"
+ #include "wayland/meta-wayland-xdg-shell.h"
+@@ -511,14 +512,14 @@ meta_wayland_surface_state_clear (MetaWaylandSurfaceState *state)
+   meta_wayland_surface_state_discard_presentation_feedback (state);
+ }
+ 
+-static void
++void
+ meta_wayland_surface_state_reset (MetaWaylandSurfaceState *state)
+ {
+   meta_wayland_surface_state_clear (state);
+   meta_wayland_surface_state_set_default (state);
+ }
+ 
+-static void
++void
+ meta_wayland_surface_state_merge_into (MetaWaylandSurfaceState *from,
+                                        MetaWaylandSurfaceState *to)
+ {
+@@ -634,11 +635,14 @@ meta_wayland_surface_state_merge_into (MetaWaylandSurfaceState *from,
+       from->subsurface_placement_ops = NULL;
+     }
+ 
++  /*
++   * A new commit indicates a new content update, so any previous
++   * content update did not go on screen and needs to be discarded.
++   */
++  meta_wayland_surface_state_discard_presentation_feedback (to);
+   wl_list_insert_list (&to->presentation_feedback_list,
+                        &from->presentation_feedback_list);
+   wl_list_init (&from->presentation_feedback_list);
+-
+-  meta_wayland_surface_state_reset (from);
+ }
+ 
+ static void
+@@ -686,11 +690,76 @@ meta_wayland_surface_discard_presentation_feedback (MetaWaylandSurface *surface)
+     }
+ }
+ 
+-static void
+-meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
++void
++meta_wayland_surface_apply_placement_ops (MetaWaylandSurface *surface,
++                                          MetaWaylandSurfaceState *state)
++{
++  GSList *l;
++
++  if (!state->subsurface_placement_ops)
++    return;
++
++  for (l = state->subsurface_placement_ops; l; l = l->next)
++    {
++      MetaWaylandSubsurfacePlacementOp *op = l->data;
++      GNode *sibling_node;
++      gboolean unref = FALSE;
++
++      if (!op->surface)
++        continue;
++
++      g_node_unlink (op->surface->output.subsurface_branch_node);
++
++      if (op->surface->output.parent && !op->parent)
++        {
++          ClutterActor *actor;
++          ClutterActor *parent_actor;
++
++          actor = CLUTTER_ACTOR (meta_wayland_surface_get_actor (op->surface));
++          if (actor)
++            {
++              parent_actor = clutter_actor_get_parent(actor);
++              clutter_actor_remove_child(parent_actor, actor);
++            }
++
++          unref = TRUE;
++        }
++      op->surface->output.parent = op->parent;
++
++      if (!op->sibling)
++        goto unref;
++
++      if (op->sibling == surface)
++        sibling_node = surface->output.subsurface_leaf_node;
++      else
++        sibling_node = op->sibling->output.subsurface_branch_node;
++
++      switch (op->placement)
++        {
++        case META_WAYLAND_SUBSURFACE_PLACEMENT_ABOVE:
++          g_node_insert_after (surface->output.subsurface_branch_node,
++                               sibling_node,
++                               op->surface->output.subsurface_branch_node);
++          break;
++        case META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW:
++          g_node_insert_before (surface->output.subsurface_branch_node,
++                                sibling_node,
++                                op->surface->output.subsurface_branch_node);
++          break;
++        }
++
++    unref:
++      if (unref)
++          g_object_unref (op->surface);
++    }
++
++  meta_wayland_surface_notify_subsurface_state_changed (surface);
++}
++
++void
++meta_wayland_surface_apply_state (MetaWaylandSurface *surface,
+                                   MetaWaylandSurfaceState *state)
+ {
+-  MetaWaylandSurface *subsurface_surface;
+   gboolean had_damage = FALSE;
+ 
+   g_signal_emit (surface, surface_signals[SURFACE_PRE_STATE_APPLIED], 0);
+@@ -737,11 +806,15 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
+                                            &surface->texture,
+                                            &error))
+             {
++              
+               g_warning ("Could not import pending buffer: %s", error->message);
+-              wl_resource_post_error (surface->resource, WL_DISPLAY_ERROR_NO_MEMORY,
+-                                      "Failed to attach buffer to surface %i: %s",
+-                                      wl_resource_get_id (surface->resource),
+-                                      error->message);
++              if (surface->resource)
++                {
++                  wl_resource_post_error(
++                                         surface->resource, WL_DISPLAY_ERROR_NO_MEMORY,
++                                         "Failed to attach buffer to surface %i: %s",
++                                         wl_resource_get_id(surface->resource), error->message);
++                }
+               g_error_free (error);
+               goto cleanup;
+             }
+@@ -852,43 +925,6 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
+         }
+     }
+ 
+-  if (state->subsurface_placement_ops)
+-    {
+-      GSList *l;
+-
+-      for (l = state->subsurface_placement_ops; l; l = l->next)
+-        {
+-          MetaWaylandSubsurfacePlacementOp *op = l->data;
+-          GNode *sibling_node;
+-
+-          if (!op->surface || !op->sibling)
+-            continue;
+-
+-          if (op->sibling == surface)
+-            sibling_node = surface->subsurface_leaf_node;
+-          else
+-            sibling_node = op->sibling->subsurface_branch_node;
+-
+-          g_node_unlink (op->surface->subsurface_branch_node);
+-
+-          switch (op->placement)
+-            {
+-            case META_WAYLAND_SUBSURFACE_PLACEMENT_ABOVE:
+-              g_node_insert_after (surface->subsurface_branch_node,
+-                                   sibling_node,
+-                                   op->surface->subsurface_branch_node);
+-              break;
+-            case META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW:
+-              g_node_insert_before (surface->subsurface_branch_node,
+-                                    sibling_node,
+-                                    op->surface->subsurface_branch_node);
+-              break;
+-            }
+-        }
+-
+-      meta_wayland_surface_notify_subsurface_state_changed (surface);
+-    }
+-
+ cleanup:
+   /* If we have a buffer that we are not using, decrease the use count so it may
+    * be released if no-one else has a use-reference to it.
+@@ -901,14 +937,6 @@ cleanup:
+                  surface_state_signals[SURFACE_STATE_SIGNAL_APPLIED],
+                  0);
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface_surface)
+-    {
+-      MetaWaylandSubsurface *subsurface;
+-
+-      subsurface = META_WAYLAND_SUBSURFACE (subsurface_surface->role);
+-      meta_wayland_subsurface_parent_state_applied (subsurface);
+-    }
+-
+   if (had_damage)
+     {
+       MetaWindow *toplevel_window;
+@@ -927,17 +955,6 @@ cleanup:
+ 
+   if (surface->role)
+     meta_wayland_surface_role_post_apply_state (surface->role, state);
+-
+-  meta_wayland_surface_state_reset (state);
+-}
+-
+-void
+-meta_wayland_surface_apply_cached_state (MetaWaylandSurface *surface)
+-{
+-  if (!surface->cached_state)
+-    return;
+-
+-  meta_wayland_surface_apply_state (surface, surface->cached_state);
+ }
+ 
+ MetaWaylandSurfaceState *
+@@ -946,19 +963,21 @@ meta_wayland_surface_get_pending_state (MetaWaylandSurface *surface)
+   return surface->pending_state;
+ }
+ 
+-MetaWaylandSurfaceState *
+-meta_wayland_surface_ensure_cached_state (MetaWaylandSurface *surface)
++MetaWaylandTransaction *
++meta_wayland_surface_ensure_transaction (MetaWaylandSurface *surface)
+ {
+-  if (!surface->cached_state)
+-    surface->cached_state = g_object_new (META_TYPE_WAYLAND_SURFACE_STATE,
+-                                          NULL);
+-  return surface->cached_state;
++  if (!surface->sub.transaction)
++      surface->sub.transaction = meta_wayland_transaction_new ();
++
++  return surface->sub.transaction;
+ }
+ 
+ static void
+ meta_wayland_surface_commit (MetaWaylandSurface *surface)
+ {
+   MetaWaylandSurfaceState *pending = surface->pending_state;
++  MetaWaylandTransaction *transaction;
++  MetaWaylandSurface *subsurface_surface;
+ 
+   COGL_TRACE_BEGIN_SCOPED (MetaWaylandSurfaceCommit,
+                            "WaylandSurface (commit)");
+@@ -967,6 +986,23 @@ meta_wayland_surface_commit (MetaWaylandSurface *surface)
+       !meta_wayland_buffer_is_realized (pending->buffer))
+     meta_wayland_buffer_realize (pending->buffer);
+ 
++  if (meta_wayland_surface_is_synchronized (surface))
++    transaction = meta_wayland_surface_ensure_transaction (surface);
++  else
++    transaction = meta_wayland_transaction_new ();
++
++  meta_wayland_transaction_merge_pending_state (transaction, surface);
++
++  META_WAYLAND_SURFACE_FOREACH_PROTOCOL_SUBSURFACE (surface, subsurface_surface)
++    {
++      if (!subsurface_surface->sub.transaction)
++        continue;
++
++      meta_wayland_transaction_merge_into (subsurface_surface->sub.transaction,
++                                           transaction);
++      subsurface_surface->sub.transaction = NULL;
++    }
++
+   /*
+    * If this is a sub-surface and it is in effective synchronous mode, only
+    * cache the pending surface state until either one of the following two
+@@ -975,24 +1011,8 @@ meta_wayland_surface_commit (MetaWaylandSurface *surface)
+    *  2) Its mode changes from synchronized to desynchronized and its parent
+    *     surface is in effective desynchronized mode.
+    */
+-  if (meta_wayland_surface_should_cache_state (surface))
+-    {
+-      MetaWaylandSurfaceState *cached_state;
+-
+-      cached_state = meta_wayland_surface_ensure_cached_state (surface);
+-
+-      /*
+-       * A new commit indicates a new content update, so any previous
+-       * cached content update did not go on screen and needs to be discarded.
+-       */
+-      meta_wayland_surface_state_discard_presentation_feedback (cached_state);
+-
+-      meta_wayland_surface_state_merge_into (pending, cached_state);
+-    }
+-  else
+-    {
+-      meta_wayland_surface_apply_state (surface, surface->pending_state);
+-    }
++  if (!meta_wayland_surface_is_synchronized (surface))
++    meta_wayland_transaction_commit (transaction);
+ }
+ 
+ static void
+@@ -1281,7 +1301,8 @@ handle_output_bound (MetaWaylandOutput  *wayland_output,
+                      struct wl_resource *output_resource,
+                      MetaWaylandSurface *surface)
+ {
+-  if (wl_resource_get_client (output_resource) ==
++  if (surface->resource &&
++      wl_resource_get_client (output_resource) ==
+       wl_resource_get_client (surface->resource))
+     wl_surface_send_enter (surface->resource, output_resource);
+ }
+@@ -1297,15 +1318,17 @@ surface_entered_output (MetaWaylandSurface *surface,
+                     G_CALLBACK (handle_output_destroyed),
+                     surface);
+ 
+-  for (iter = wayland_output->resources; iter != NULL; iter = iter->next)
++  if (surface->resource)
+     {
+-      resource = iter->data;
++      for (iter = wayland_output->resources; iter != NULL; iter = iter->next) {
++        resource = iter->data;
+ 
+-      if (wl_resource_get_client (resource) !=
+-          wl_resource_get_client (surface->resource))
+-        continue;
++        if (wl_resource_get_client(resource) !=
++            wl_resource_get_client(surface->resource))
++          continue;
+ 
+-      wl_surface_send_enter (surface->resource, resource);
++        wl_surface_send_enter(surface->resource, resource);
++      }
+     }
+ 
+   g_signal_connect (wayland_output, "output-bound",
+@@ -1328,6 +1351,9 @@ surface_left_output (MetaWaylandSurface *surface,
+                                         G_CALLBACK (handle_output_bound),
+                                         surface);
+ 
++  if (!surface->resource)
++    return;
++
+   for (iter = wayland_output->resources; iter != NULL; iter = iter->next)
+     {
+       resource = iter->data;
+@@ -1426,9 +1452,9 @@ unlink_note (GNode    *node,
+ }
+ 
+ static void
+-wl_surface_destructor (struct wl_resource *resource)
++meta_wayland_surface_dispose (GObject *object)
+ {
+-  MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
++  MetaWaylandSurface *surface = META_WAYLAND_SURFACE (object);
+   MetaWaylandCompositor *compositor = surface->compositor;
+   MetaWaylandFrameCallback *cb, *next;
+ 
+@@ -1447,9 +1473,6 @@ wl_surface_destructor (struct wl_resource *resource)
+   g_clear_pointer (&surface->texture, cogl_object_unref);
+   g_clear_pointer (&surface->buffer_ref, meta_wayland_buffer_ref_unref);
+ 
+-  g_clear_object (&surface->cached_state);
+-  g_clear_object (&surface->pending_state);
+-
+   if (surface->opaque_region)
+     cairo_region_destroy (surface->opaque_region);
+   if (surface->input_region)
+@@ -1471,22 +1494,50 @@ wl_surface_destructor (struct wl_resource *resource)
+ 
+   meta_wayland_surface_discard_presentation_feedback (surface);
+ 
++  if (surface->output.subsurface_branch_node)
++    {
++      g_node_children_foreach (surface->output.subsurface_branch_node,
++                               G_TRAVERSE_NON_LEAVES,
++                               unlink_note,
++                               NULL);
++      g_clear_pointer (&surface->output.subsurface_branch_node, g_node_destroy);
++    }
++
++  g_hash_table_destroy (surface->shortcut_inhibited_seats);
++
++  G_OBJECT_CLASS (meta_wayland_surface_parent_class)->dispose (object);
++}
++
++static void
++wl_surface_destructor (struct wl_resource *resource)
++{
++  MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
++  MetaWaylandTransaction *transaction;
++
++  g_clear_object (&surface->pending_state);
++
+   if (surface->resource)
+-    wl_resource_set_user_data (surface->resource, NULL);
++    {
++      wl_resource_set_user_data(surface->resource, NULL);
++      surface->resource = NULL;
++    }
+ 
+   if (surface->wl_subsurface)
+     wl_resource_destroy (surface->wl_subsurface);
+ 
+-  if (surface->subsurface_branch_node)
++  if (surface->protocol.subsurface_branch_node)
+     {
+-      g_node_children_foreach (surface->subsurface_branch_node,
++      g_node_children_foreach (surface->protocol.subsurface_branch_node,
+                                G_TRAVERSE_NON_LEAVES,
+                                unlink_note,
+                                NULL);
+-      g_clear_pointer (&surface->subsurface_branch_node, g_node_destroy);
++      g_clear_pointer (&surface->protocol.subsurface_branch_node, g_node_destroy);
+     }
+ 
+-  g_hash_table_destroy (surface->shortcut_inhibited_seats);
++  transaction = meta_wayland_surface_ensure_transaction (surface);
++  surface->sub.transaction = NULL;
++  meta_wayland_transaction_destroy_surface (transaction, surface);
++  meta_wayland_transaction_commit (transaction);
+ 
+   g_object_unref (surface);
+ }
+@@ -1720,9 +1771,13 @@ meta_wayland_surface_init (MetaWaylandSurface *surface)
+ 
+   surface->buffer_ref = meta_wayland_buffer_ref_new ();
+ 
+-  surface->subsurface_branch_node = g_node_new (surface);
+-  surface->subsurface_leaf_node =
+-    g_node_prepend_data (surface->subsurface_branch_node, surface);
++  surface->output.subsurface_branch_node = g_node_new (surface);
++  surface->output.subsurface_leaf_node =
++    g_node_prepend_data (surface->output.subsurface_branch_node, surface);
++
++  surface->protocol.subsurface_branch_node = g_node_new (surface);
++  surface->protocol.subsurface_leaf_node =
++    g_node_prepend_data (surface->protocol.subsurface_branch_node, surface);
+ }
+ 
+ static void
+@@ -1730,6 +1785,8 @@ meta_wayland_surface_class_init (MetaWaylandSurfaceClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+ 
++  object_class->dispose = meta_wayland_surface_dispose;
++
+   surface_signals[SURFACE_DESTROY] =
+     g_signal_new ("destroy",
+                   G_TYPE_FROM_CLASS (object_class),
+@@ -1935,24 +1992,24 @@ meta_wayland_surface_get_window (MetaWaylandSurface *surface)
+ }
+ 
+ static gboolean
+-meta_wayland_surface_role_should_cache_state (MetaWaylandSurfaceRole *surface_role)
++meta_wayland_surface_role_is_synchronized (MetaWaylandSurfaceRole *surface_role)
+ {
+   MetaWaylandSurfaceRoleClass *klass;
+ 
+   klass = META_WAYLAND_SURFACE_ROLE_GET_CLASS (surface_role);
+-  if (klass->should_cache_state)
+-    return klass->should_cache_state (surface_role);
++  if (klass->is_synchronized)
++    return klass->is_synchronized (surface_role);
+   else
+     return FALSE;
+ }
+ 
+ gboolean
+-meta_wayland_surface_should_cache_state (MetaWaylandSurface *surface)
++meta_wayland_surface_is_synchronized (MetaWaylandSurface *surface)
+ {
+   if (!surface->role)
+     return FALSE;
+ 
+-  return meta_wayland_surface_role_should_cache_state (surface->role);
++  return meta_wayland_surface_role_is_synchronized (surface->role);
+ }
+ 
+ static void
+diff --git a/src/wayland/meta-wayland-surface.h b/src/wayland/meta-wayland-surface.h
+index f0153b23b..a9df69622 100644
+--- a/src/wayland/meta-wayland-surface.h
++++ b/src/wayland/meta-wayland-surface.h
+@@ -63,7 +63,7 @@ struct _MetaWaylandSurfaceRoleClass
+   gboolean (*is_on_logical_monitor) (MetaWaylandSurfaceRole *surface_role,
+                                      MetaLogicalMonitor     *logical_monitor);
+   MetaWaylandSurface * (*get_toplevel) (MetaWaylandSurfaceRole *surface_role);
+-  gboolean (*should_cache_state) (MetaWaylandSurfaceRole *surface_role);
++  gboolean (*is_synchronized) (MetaWaylandSurfaceRole *surface_role);
+   void (*notify_subsurface_state_changed) (MetaWaylandSurfaceRole *surface_role);
+   void (*get_relative_coordinates) (MetaWaylandSurfaceRole *surface_role,
+                                     float                   abs_x,
+@@ -162,8 +162,6 @@ struct _MetaWaylandSurface
+   cairo_region_t *opaque_region;
+   int scale;
+   int32_t offset_x, offset_y;
+-  GNode *subsurface_branch_node;
+-  GNode *subsurface_leaf_node;
+   GHashTable *outputs;
+   MetaMonitorTransform buffer_transform;
+ 
+@@ -187,15 +185,18 @@ struct _MetaWaylandSurface
+ 
+   /* All the pending state that wl_surface.commit will apply. */
+   MetaWaylandSurfaceState *pending_state;
+-  /* State cached due to inter-surface synchronization such. */
+-  MetaWaylandSurfaceState *cached_state;
++
++  struct MetaWaylandSubSurfaceState {
++    MetaWaylandSurface *parent;
++    GNode *subsurface_branch_node;
++    GNode *subsurface_leaf_node;
++  } output, protocol;
+ 
+   /* Extension resources. */
+   struct wl_resource *wl_subsurface;
+ 
+   /* wl_subsurface stuff. */
+   struct {
+-    MetaWaylandSurface *parent;
+     struct wl_listener parent_destroy_listener;
+ 
+     int x;
+@@ -211,9 +212,10 @@ struct _MetaWaylandSurface
+      */
+     gboolean synchronous;
+ 
+-    int32_t pending_x;
+-    int32_t pending_y;
+-    gboolean pending_pos;
++    /* Transaction which contains all synchronized state for this sub-surface.
++     * This can include state for nested sub-surfaces.
++     */
++    MetaWaylandTransaction *transaction;
+   } sub;
+ 
+   /* wp_viewport */
+@@ -247,6 +249,13 @@ struct _MetaWaylandSurface
+      */
+     uint64_t sequence;
+   } presentation_time;
++
++  /* Transactions */
++  struct {
++    /* First & last committed transaction which has an entry for this surface */
++    MetaWaylandTransaction *first;
++    MetaWaylandTransaction *last;
++  } transaction;
+ };
+ 
+ void                meta_wayland_shell_init     (MetaWaylandCompositor *compositor);
+@@ -256,15 +265,22 @@ MetaWaylandSurface *meta_wayland_surface_create (MetaWaylandCompositor *composit
+                                                  struct wl_resource    *compositor_resource,
+                                                  guint32                id);
+ 
+-MetaWaylandSurfaceState *
+-                    meta_wayland_surface_get_pending_state (MetaWaylandSurface *surface);
++void                meta_wayland_surface_state_reset (MetaWaylandSurfaceState *state);
+ 
+-MetaWaylandSurfaceState *
+-                    meta_wayland_surface_ensure_cached_state (MetaWaylandSurface *surface);
++void                meta_wayland_surface_state_merge_into (MetaWaylandSurfaceState *from,
++                                                           MetaWaylandSurfaceState *to);
++
++void                meta_wayland_surface_apply_placement_ops (MetaWaylandSurface *surface,
++                                                              MetaWaylandSurfaceState *state);
+ 
+-void                meta_wayland_surface_apply_cached_state (MetaWaylandSurface *surface);
++void                meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
++                                                      MetaWaylandSurfaceState *state);
++
++MetaWaylandSurfaceState *
++                    meta_wayland_surface_get_pending_state (MetaWaylandSurface *surface);
+ 
+-gboolean            meta_wayland_surface_is_effectively_synchronized (MetaWaylandSurface *surface);
++MetaWaylandTransaction *
++                    meta_wayland_surface_ensure_transaction (MetaWaylandSurface *surface);
+ 
+ gboolean            meta_wayland_surface_assign_role (MetaWaylandSurface *surface,
+                                                       GType               role_type,
+@@ -302,7 +318,7 @@ MetaWaylandSurface *meta_wayland_surface_get_toplevel (MetaWaylandSurface *surfa
+ 
+ MetaWindow *        meta_wayland_surface_get_window (MetaWaylandSurface *surface);
+ 
+-gboolean            meta_wayland_surface_should_cache_state (MetaWaylandSurface *surface);
++gboolean            meta_wayland_surface_is_synchronized (MetaWaylandSurface *surface);
+ 
+ MetaWindow *        meta_wayland_surface_get_toplevel_window (MetaWaylandSurface *surface);
+ 
+@@ -380,19 +396,24 @@ meta_get_next_subsurface_sibling (GNode *n)
+ }
+ 
+ static inline GNode *
+-meta_get_first_subsurface_node (MetaWaylandSurface *surface)
++meta_get_first_subsurface_node (struct MetaWaylandSubSurfaceState *sub)
+ {
+   GNode *n;
+ 
+-  n = g_node_first_child (surface->subsurface_branch_node);
++  n = g_node_first_child (sub->subsurface_branch_node);
+   if (!G_NODE_IS_LEAF (n))
+     return n;
+   else
+     return meta_get_next_subsurface_sibling (n);
+ }
+ 
+-#define META_WAYLAND_SURFACE_FOREACH_SUBSURFACE(surface, subsurface) \
+-  for (GNode *G_PASTE(__n, __LINE__) = meta_get_first_subsurface_node ((surface)); \
++#define META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE(surface, subsurface) \
++  for (GNode *G_PASTE(__n, __LINE__) = meta_get_first_subsurface_node ((&surface->output)); \
++       (subsurface = (G_PASTE (__n, __LINE__) ? G_PASTE (__n, __LINE__)->data : NULL)); \
++       G_PASTE (__n, __LINE__) = meta_get_next_subsurface_sibling (G_PASTE (__n, __LINE__)))
++
++#define META_WAYLAND_SURFACE_FOREACH_PROTOCOL_SUBSURFACE(surface, subsurface) \
++  for (GNode *G_PASTE(__n, __LINE__) = meta_get_first_subsurface_node ((&surface->protocol)); \
+        (subsurface = (G_PASTE (__n, __LINE__) ? G_PASTE (__n, __LINE__)->data : NULL)); \
+        G_PASTE (__n, __LINE__) = meta_get_next_subsurface_sibling (G_PASTE (__n, __LINE__)))
+ 
+diff --git a/src/wayland/meta-wayland-tablet-pad.c b/src/wayland/meta-wayland-tablet-pad.c
+index c0b408c10..6840a8ff2 100644
+--- a/src/wayland/meta-wayland-tablet-pad.c
++++ b/src/wayland/meta-wayland-tablet-pad.c
+@@ -465,7 +465,7 @@ meta_wayland_tablet_pad_set_focus (MetaWaylandTabletPad *pad,
+   tablet = meta_wayland_tablet_seat_lookup_paired_tablet (pad->tablet_seat,
+                                                           pad);
+ 
+-  if (tablet != NULL && surface != NULL)
++  if (tablet != NULL && surface != NULL && surface->resource != NULL)
+     {
+       struct wl_client *client;
+ 
+diff --git a/src/wayland/meta-wayland-tablet-tool.c b/src/wayland/meta-wayland-tablet-tool.c
+index a8de868bc..80194bbc0 100644
+--- a/src/wayland/meta-wayland-tablet-tool.c
++++ b/src/wayland/meta-wayland-tablet-tool.c
+@@ -118,10 +118,9 @@ meta_wayland_tablet_tool_set_cursor_surface (MetaWaylandTabletTool *tool,
+       wl_list_remove (&tool->cursor_surface_destroy_listener.link);
+     }
+ 
+-  tool->cursor_surface = surface;
+-
+-  if (tool->cursor_surface)
++  if (surface && surface->resource)
+     {
++      tool->cursor_surface = surface;
+       meta_wayland_surface_update_outputs (tool->cursor_surface);
+       wl_resource_add_destroy_listener (tool->cursor_surface->resource,
+                                         &tool->cursor_surface_destroy_listener);
+@@ -886,7 +885,7 @@ tablet_tool_can_grab_surface (MetaWaylandTabletTool *tool,
+   if (tool->focus_surface == surface)
+     return TRUE;
+ 
+-  META_WAYLAND_SURFACE_FOREACH_SUBSURFACE (surface, subsurface)
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface)
+     {
+       if (tablet_tool_can_grab_surface (tool, subsurface))
+         return TRUE;
+diff --git a/src/wayland/meta-wayland-text-input-legacy.c b/src/wayland/meta-wayland-text-input-legacy.c
+index 442708e0f..5829464b0 100644
+--- a/src/wayland/meta-wayland-text-input-legacy.c
++++ b/src/wayland/meta-wayland-text-input-legacy.c
+@@ -247,7 +247,7 @@ meta_wayland_gtk_text_input_set_focus (MetaWaylandGtkTextInput *text_input,
+       text_input->surface = NULL;
+     }
+ 
+-  if (surface)
++  if (surface && surface->resource)
+     {
+       struct wl_resource *focus_surface_resource;
+ 
+diff --git a/src/wayland/meta-wayland-text-input.c b/src/wayland/meta-wayland-text-input.c
+index b471e8e1a..aa95641cb 100644
+--- a/src/wayland/meta-wayland-text-input.c
++++ b/src/wayland/meta-wayland-text-input.c
+@@ -346,7 +346,7 @@ meta_wayland_text_input_set_focus (MetaWaylandTextInput *text_input,
+       text_input->surface = NULL;
+     }
+ 
+-  if (surface)
++  if (surface && surface->resource)
+     {
+       struct wl_resource *focus_surface_resource;
+ 
+diff --git a/src/wayland/meta-wayland-touch.c b/src/wayland/meta-wayland-touch.c
+index 002ff16f7..a3f835935 100644
+--- a/src/wayland/meta-wayland-touch.c
++++ b/src/wayland/meta-wayland-touch.c
+@@ -222,7 +222,7 @@ meta_wayland_touch_update (MetaWaylandTouch   *touch,
+       if (META_IS_SURFACE_ACTOR_WAYLAND (actor))
+         surface = meta_surface_actor_wayland_get_surface (META_SURFACE_ACTOR_WAYLAND (actor));
+ 
+-      if (!surface)
++      if (!surface || !surface->resource)
+         return;
+ 
+       touch_info = touch_get_info (touch, sequence, TRUE);
+diff --git a/src/wayland/meta-wayland-transaction.c b/src/wayland/meta-wayland-transaction.c
+new file mode 100644
+index 000000000..612c756c7
+--- /dev/null
++++ b/src/wayland/meta-wayland-transaction.c
+@@ -0,0 +1,505 @@
++/*
++ * Wayland Transaction Support
++ *
++ * Copyright (C) 2021 Red Hat, Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
++ * 02111-1307, USA.
++ */
++
++#include "config.h"
++
++#include <glib-unix.h>
++
++#include "wayland/meta-wayland.h"
++#include "wayland/meta-wayland-dma-buf.h"
++#include "wayland/meta-wayland-subsurface.h"
++#include "wayland/meta-wayland-transaction.h"
++
++struct _MetaWaylandTransaction {
++  GList node;
++  GQueue *queue;
++
++  GHashTable *entries;
++
++  /* Sources for buffers which are not ready yet */
++  GHashTable *buf_sources;
++};
++
++typedef struct _MetaWaylandTransactionEntry {
++  MetaWaylandSurfaceState *state;
++
++  /* Sub-surface position */
++  gboolean has_sub_pos;
++  int x;
++  int y;
++} MetaWaylandTransactionEntry;
++
++static MetaWaylandTransactionEntry *
++meta_wayland_transaction_get_entry (MetaWaylandTransaction *transaction,
++                                    MetaWaylandSurface     *surface)
++{
++  return g_hash_table_lookup (transaction->entries, surface);
++}
++
++static void
++meta_wayland_transaction_sync_child_states (MetaWaylandSurface *surface)
++{
++  MetaWaylandSurface *subsurface_surface;
++
++  META_WAYLAND_SURFACE_FOREACH_OUTPUT_SUBSURFACE (surface, subsurface_surface)
++    {
++      MetaWaylandSubsurface *subsurface;
++      MetaWaylandActorSurface *actor_surface;
++
++      subsurface = META_WAYLAND_SUBSURFACE (subsurface_surface->role);
++      actor_surface = META_WAYLAND_ACTOR_SURFACE (subsurface);
++      meta_wayland_actor_surface_sync_actor_state (actor_surface);
++    }
++}
++
++static void
++meta_wayland_transaction_apply_subsurface_position (MetaWaylandSurface *surface,
++                                                    MetaWaylandTransactionEntry *entry)
++{
++  if (!entry->has_sub_pos)
++    return;
++
++  surface->sub.x = entry->x;
++  surface->sub.y = entry->y;
++}
++
++static gboolean
++is_ancestor (MetaWaylandSurface *candidate,
++             MetaWaylandSurface *reference)
++{
++  while ((reference = reference->output.parent))
++    {
++      if (reference == candidate)
++        return TRUE;
++    }
++
++  return FALSE;
++}
++
++static int
++meta_wayland_transaction_compare (const void *key1,
++                                  const void *key2)
++{
++  MetaWaylandSurface *surface1 = *(MetaWaylandSurface **)key1;
++  MetaWaylandSurface *surface2 = *(MetaWaylandSurface **)key2;
++
++  /* Order of siblings doesn't matter */
++  if (surface1->output.parent == surface2->output.parent)
++    return 0;
++
++  /* Ancestor surfaces come before descendant surfaces */
++  if (is_ancestor (surface1, surface2))
++    return 1;
++
++  if (is_ancestor (surface2, surface1))
++    return -1;
++
++  /*
++   * Order unrelated surfaces by their toplevel surface pointer values, to
++   * prevent unrelated surfaces from getting mixed between siblings
++   */
++  return (meta_wayland_surface_get_toplevel (surface1) <
++          meta_wayland_surface_get_toplevel (surface2)) ? -1 : 1;
++}
++
++void
++meta_wayland_transaction_destroy (MetaWaylandTransaction *transaction)
++{
++  if (transaction->queue)
++    g_queue_unlink (transaction->queue, &transaction->node);
++  if (transaction->buf_sources)
++    g_hash_table_destroy (transaction->buf_sources);
++  g_hash_table_destroy (transaction->entries);
++  g_free (transaction);
++}
++
++static MetaWaylandTransaction *
++meta_wayland_transaction_apply (MetaWaylandTransaction *transaction)
++{
++  MetaWaylandTransaction *next_candidate = NULL;
++  MetaWaylandSurface **surfaces;
++  unsigned int num_surfaces;
++  MetaWaylandSurface *surface;
++  MetaWaylandTransactionEntry *entry;
++  unsigned int closest = UINT_MAX;
++  int i;
++
++  if (g_hash_table_size (transaction->entries) == 0)
++    goto destroy;
++
++  surfaces = (MetaWaylandSurface **)
++    g_hash_table_get_keys_as_array (transaction->entries, &num_surfaces);
++
++  /* Apply sub-surface states to ensure output surface hierarchy is up to date */
++  for (i = 0; i < num_surfaces; i++)
++    {
++      surface = surfaces[i];
++      entry = meta_wayland_transaction_get_entry (transaction, surface);
++      if (!entry)
++        continue;
++
++      meta_wayland_transaction_apply_subsurface_position (surface, entry);
++      if (entry->state)
++        meta_wayland_surface_apply_placement_ops (surface, entry->state);
++    }
++
++  /* Sort surfaces from ancestors to descendants */
++  qsort (surfaces, num_surfaces, sizeof (MetaWaylandSurface *),
++         meta_wayland_transaction_compare);
++
++  /* Apply states from ancestors to descendants */
++  for (i = 0; i < num_surfaces; i++)
++    {
++      surface = surfaces[i];
++      entry = meta_wayland_transaction_get_entry (transaction, surface);
++      if (entry && entry->state)
++        meta_wayland_surface_apply_state (surface, entry->state);
++
++      if (surface->transaction.last == transaction)
++        {
++          surface->transaction.first = NULL;
++          surface->transaction.last = NULL;
++        }
++      else
++        {
++          GList *node;
++          unsigned int distance;
++
++          /* Find next transaction which has an entry for this surface */
++          for (node = transaction->node.next, distance = 1;
++               node;
++               node = node->next, distance++)
++            {
++              MetaWaylandTransaction *next = node->data;
++
++              if (surface->transaction.last == next ||
++                  g_hash_table_contains (next->entries, surface))
++                {
++                  if (distance < closest)
++                    {
++                      next_candidate = next;
++                      closest = distance;
++                    }
++
++                  surface->transaction.first = next;
++                  break;
++                }
++            }
++
++          g_assert (surface->transaction.first != transaction);
++        }
++    }
++
++  /* Synchronize child states from descendants to ancestors */
++  for (i = num_surfaces - 1; i >= 0; i--)
++    meta_wayland_transaction_sync_child_states (surfaces[i]);
++
++  g_free (surfaces);
++
++destroy:
++  meta_wayland_transaction_destroy (transaction);
++
++  /* Next transaction which was blocked by this one */
++  return next_candidate;
++}
++
++static MetaWaylandTransaction *
++meta_wayland_transaction_maybe_apply_one (MetaWaylandTransaction *transaction)
++{
++  GHashTableIter iter;
++  MetaWaylandSurface *surface;
++  void *value;
++
++  if (transaction->buf_sources &&
++      g_hash_table_size (transaction->buf_sources) > 0)
++    return NULL;
++
++  g_hash_table_iter_init (&iter, transaction->entries);
++  while (g_hash_table_iter_next (&iter, (void**)&surface, &value))
++    {
++      if (surface->transaction.first != transaction)
++        return NULL;
++    }
++
++  return meta_wayland_transaction_apply (transaction);
++}
++
++static void
++meta_wayland_transaction_maybe_apply (MetaWaylandTransaction *transaction)
++{
++  while (transaction)
++    transaction = meta_wayland_transaction_maybe_apply_one (transaction);
++}
++
++static void
++meta_wayland_transaction_dma_buf_dispatch (MetaWaylandBuffer *buffer,
++                                           void              *user_data)
++{
++  MetaWaylandTransaction *transaction = user_data;
++
++  if (!transaction->buf_sources ||
++      !g_hash_table_steal (transaction->buf_sources, buffer))
++    return;
++
++  meta_wayland_transaction_maybe_apply (transaction);
++}
++
++static gboolean
++meta_wayland_transaction_add_dma_buf_source (MetaWaylandTransaction *transaction,
++                                             MetaWaylandBuffer      *buffer)
++{
++  GSource *source;
++
++  if (transaction->buf_sources &&
++      g_hash_table_contains (transaction->buf_sources, buffer))
++    return FALSE;
++
++  source = meta_wayland_dma_buf_get_source (buffer,
++                                            meta_wayland_transaction_dma_buf_dispatch,
++                                            transaction);
++  if (!source)
++    return FALSE;
++
++  if (!transaction->buf_sources)
++    {
++      transaction->buf_sources =
++        g_hash_table_new_full (NULL, NULL, NULL,
++                               (GDestroyNotify)g_source_destroy);
++    }
++
++  g_hash_table_insert (transaction->buf_sources, buffer, source);
++  g_source_attach (source, NULL);
++  g_source_unref (source);
++  return TRUE;
++}
++
++void
++meta_wayland_transaction_commit (MetaWaylandTransaction *transaction)
++{
++  gboolean maybe_apply = TRUE;
++  GHashTableIter iter;
++  MetaWaylandSurface *surface;
++  MetaWaylandTransactionEntry *entry;
++
++  g_hash_table_iter_init (&iter, transaction->entries);
++  while (g_hash_table_iter_next (&iter, (void**)&surface, (void**)&entry))
++    {
++      MetaWaylandBuffer *buffer = NULL;
++
++      surface->transaction.last = transaction;
++
++      if (!surface->transaction.first)
++        surface->transaction.first = transaction;
++      else
++        maybe_apply = FALSE;
++
++      if (entry && entry->state)
++        buffer = entry->state->buffer;
++      if (buffer &&
++          meta_wayland_transaction_add_dma_buf_source (transaction, buffer))
++        maybe_apply = FALSE;
++
++      if (!transaction->queue)
++        transaction->queue =
++          meta_wayland_compositor_get_transactions (surface->compositor);
++    }
++
++  if (transaction->queue)
++    g_queue_push_tail_link (transaction->queue, &transaction->node);
++
++  if (maybe_apply)
++    meta_wayland_transaction_maybe_apply (transaction);
++}
++
++static void
++meta_wayland_transaction_add_entry (MetaWaylandTransaction      *transaction,
++                                    MetaWaylandSurface          *surface,
++                                    MetaWaylandTransactionEntry *entry)
++{
++  g_hash_table_insert (transaction->entries, g_object_ref (surface), entry);
++}
++
++static MetaWaylandTransactionEntry *
++meta_wayland_transaction_ensure_entry (MetaWaylandTransaction *transaction,
++                                       MetaWaylandSurface     *surface)
++{
++  MetaWaylandTransactionEntry *entry;
++
++  entry = meta_wayland_transaction_get_entry (transaction, surface);
++  if (entry)
++    return entry;
++
++  entry = g_new0 (MetaWaylandTransactionEntry, 1);
++  meta_wayland_transaction_add_entry (transaction, surface, entry);
++
++  return entry;
++}
++
++void
++meta_wayland_transaction_add_subsurface_position (MetaWaylandTransaction *transaction,
++                                                  MetaWaylandSurface     *surface,
++                                                  int                     x,
++                                                  int                     y)
++{
++  MetaWaylandTransactionEntry *entry;
++
++  entry = meta_wayland_transaction_ensure_entry (transaction, surface);
++  entry->x = x;
++  entry->y = y;
++  entry->has_sub_pos = TRUE;
++}
++
++void
++meta_wayland_transaction_destroy_surface (MetaWaylandTransaction *transaction,
++                                          MetaWaylandSurface     *surface)
++{
++  /*
++   * NULL entry means the surface is being destroyed. The last reference will be
++   * dropped in meta_wayland_transaction_apply.
++   */
++  meta_wayland_transaction_add_entry (transaction, surface, NULL);
++}
++
++static void
++meta_wayland_transaction_entry_merge_into (MetaWaylandTransactionEntry *from,
++                                           MetaWaylandTransactionEntry *to)
++{
++  if (from->has_sub_pos)
++    {
++      to->x = from->x;
++      to->y = from->y;
++      to->has_sub_pos = TRUE;
++    }
++
++  if (to->state)
++    {
++      meta_wayland_surface_state_merge_into (from->state, to->state);
++      g_object_unref (from->state);
++      return;
++    }
++
++  to->state = from->state;
++}
++
++void
++meta_wayland_transaction_merge_into (MetaWaylandTransaction *from,
++                                     MetaWaylandTransaction *to)
++{
++  GHashTableIter iter;
++  MetaWaylandSurface *surface;
++  MetaWaylandTransactionEntry *from_entry, *to_entry;
++
++  g_hash_table_iter_init (&iter, from->entries);
++  while (g_hash_table_iter_next (&iter, (void**)&surface, (void**)&from_entry))
++    {
++      g_hash_table_iter_steal (&iter);
++      to_entry = meta_wayland_transaction_get_entry (to, surface);
++      if (!to_entry)
++        {
++          meta_wayland_transaction_add_entry (to, surface, from_entry);
++          continue;
++        }
++
++      meta_wayland_transaction_entry_merge_into (from_entry, to_entry);
++      g_free (from_entry);
++    }
++
++  meta_wayland_transaction_destroy (from);
++}
++
++void
++meta_wayland_transaction_merge_pending_state (MetaWaylandTransaction *transaction,
++                                              MetaWaylandSurface *surface)
++{
++  MetaWaylandSurfaceState *pending = surface->pending_state;
++  MetaWaylandTransactionEntry *entry;
++
++  entry = meta_wayland_transaction_ensure_entry (transaction, surface);
++
++  if (!entry->state)
++    {
++      entry->state = pending;
++      surface->pending_state = g_object_new (META_TYPE_WAYLAND_SURFACE_STATE,
++                                             NULL);
++      return;
++    }
++
++  meta_wayland_surface_state_merge_into (pending, entry->state);
++  meta_wayland_surface_state_reset (pending);
++}
++
++static void
++meta_wayland_transaction_surface_destroy (void *value)
++{
++  MetaWaylandSurface *surface = value;
++
++  g_object_unref (surface);
++}
++
++static void
++meta_wayland_transaction_entry_destroy (void *value)
++{
++  MetaWaylandTransactionEntry *entry = value;
++
++  if (!entry)
++    return;
++
++  if (entry->state)
++    g_object_unref (entry->state);
++  g_free (entry);
++}
++
++MetaWaylandTransaction *
++meta_wayland_transaction_new (void)
++{
++  MetaWaylandTransaction *transaction;
++
++  transaction = g_new0 (MetaWaylandTransaction, 1);
++  transaction->node.data = transaction;
++  transaction->entries = g_hash_table_new_full (NULL, NULL,
++                                                meta_wayland_transaction_surface_destroy,
++                                                meta_wayland_transaction_entry_destroy);
++
++  return transaction;
++}
++
++void
++meta_wayland_transaction_finalize (MetaWaylandCompositor *compositor)
++{
++  GQueue *transactions;
++  GList *node;
++
++  transactions = meta_wayland_compositor_get_transactions (compositor);
++  while ((node = g_queue_peek_head_link (transactions)))
++    {
++      g_queue_unlink (transactions, node);
++      meta_wayland_transaction_destroy (node->data);
++    }
++}
++
++void
++meta_wayland_transaction_init (MetaWaylandCompositor *compositor)
++{
++  GQueue *transactions;
++
++  transactions = meta_wayland_compositor_get_transactions (compositor);
++  g_queue_init (transactions);
++}
+diff --git a/src/wayland/meta-wayland-transaction.h b/src/wayland/meta-wayland-transaction.h
+new file mode 100644
+index 000000000..70ac199c0
+--- /dev/null
++++ b/src/wayland/meta-wayland-transaction.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2021 Red Hat, Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
++ * 02111-1307, USA.
++ */
++
++#ifndef META_WAYLAND_TRANSACTION_H
++#define META_WAYLAND_TRANSACTION_H
++
++#include "wayland/meta-wayland-types.h"
++
++void                meta_wayland_transaction_destroy (MetaWaylandTransaction *transaction);
++
++void                meta_wayland_transaction_commit (MetaWaylandTransaction *transaction);
++
++void                meta_wayland_transaction_add_subsurface_position (MetaWaylandTransaction *transaction,
++                                                                      MetaWaylandSurface     *surface,
++                                                                      int                     x,
++                                                                      int                     y);
++
++void                meta_wayland_transaction_destroy_surface (MetaWaylandTransaction *transaction,
++                                                              MetaWaylandSurface     *surface);
++
++void                meta_wayland_transaction_merge_into (MetaWaylandTransaction *from,
++                                                         MetaWaylandTransaction *to);
++
++void                meta_wayland_transaction_merge_pending_state (MetaWaylandTransaction *transaction,
++                                                                  MetaWaylandSurface *surface);
++
++MetaWaylandTransaction *
++                    meta_wayland_transaction_new (void);
++
++void                meta_wayland_transaction_finalize (MetaWaylandCompositor *compositor);
++
++void                meta_wayland_transaction_init (MetaWaylandCompositor *compositor);
++
++#endif
+diff --git a/src/wayland/meta-wayland-types.h b/src/wayland/meta-wayland-types.h
+index 00712ad1f..3a356d3b7 100644
+--- a/src/wayland/meta-wayland-types.h
++++ b/src/wayland/meta-wayland-types.h
+@@ -55,6 +55,8 @@ typedef struct _MetaWaylandRegion MetaWaylandRegion;
+ typedef struct _MetaWaylandSurface MetaWaylandSurface;
+ typedef struct _MetaWaylandSurfaceState MetaWaylandSurfaceState;
+ 
++typedef struct _MetaWaylandTransaction MetaWaylandTransaction;
++
+ typedef struct _MetaWaylandOutput MetaWaylandOutput;
+ 
+ typedef struct _MetaWaylandWindowConfiguration MetaWaylandWindowConfiguration;
+diff --git a/src/wayland/meta-wayland-xdg-shell.c b/src/wayland/meta-wayland-xdg-shell.c
+index 5548e558c..529c1b246 100644
+--- a/src/wayland/meta-wayland-xdg-shell.c
++++ b/src/wayland/meta-wayland-xdg-shell.c
+@@ -845,9 +845,12 @@ meta_wayland_xdg_toplevel_post_apply_state (MetaWaylandSurfaceRole  *surface_rol
+         }
+       else
+         {
+-          wl_resource_post_error (surface->resource,
+-                                  XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE,
+-                                  "Invalid min/max size");
++          if (surface->resource)
++            {
++              wl_resource_post_error(surface->resource,
++                                     XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE,
++                                     "Invalid min/max size");
++            }
+         }
+     }
+ }
+diff --git a/src/wayland/meta-wayland.c b/src/wayland/meta-wayland.c
+index 8f16aa429..223cc5e9c 100644
+--- a/src/wayland/meta-wayland.c
++++ b/src/wayland/meta-wayland.c
+@@ -45,6 +45,7 @@
+ #include "wayland/meta-wayland-seat.h"
+ #include "wayland/meta-wayland-subsurface.h"
+ #include "wayland/meta-wayland-tablet-manager.h"
++#include "wayland/meta-wayland-transaction.h"
+ #include "wayland/meta-wayland-xdg-foreign.h"
+ #include "wayland/meta-xwayland-grab-keyboard.h"
+ #include "wayland/meta-xwayland-private.h"
+@@ -356,6 +357,12 @@ meta_wayland_compositor_remove_presentation_feedback_surface (MetaWaylandComposi
+     g_list_remove (compositor->presentation_time.feedback_surfaces, surface);
+ }
+ 
++GQueue *
++meta_wayland_compositor_get_transactions (MetaWaylandCompositor *compositor)
++{
++  return &compositor->transactions;
++}
++
+ static void
+ set_gnome_env (const char *name,
+ 	       const char *value)
+@@ -513,6 +520,7 @@ meta_wayland_compositor_setup (MetaWaylandCompositor *compositor)
+   meta_wayland_text_input_init (compositor);
+   meta_wayland_gtk_text_input_init (compositor);
+   meta_wayland_init_presentation_time (compositor);
++  meta_wayland_transaction_init (compositor);
+ 
+   /* Xwayland specific protocol, needs to be filtered out for all other clients */
+   if (meta_xwayland_grab_keyboard_init (compositor))
+@@ -595,6 +603,8 @@ meta_wayland_finalize (void)
+   if (compositor->wayland_display)
+     wl_display_destroy_clients (compositor->wayland_display);
+ 
++  meta_wayland_transaction_finalize (compositor);
++
+   g_clear_pointer (&compositor->seat, meta_wayland_seat_free);
+ 
+   g_clear_pointer (&compositor->display_name, g_free);
+diff --git a/src/wayland/meta-wayland.h b/src/wayland/meta-wayland.h
+index 6c655e427..be1d07c17 100644
+--- a/src/wayland/meta-wayland.h
++++ b/src/wayland/meta-wayland.h
+@@ -72,6 +72,8 @@ void                    meta_wayland_compositor_add_presentation_feedback_surfac
+ void                    meta_wayland_compositor_remove_presentation_feedback_surface (MetaWaylandCompositor *compositor,
+                                                                                       MetaWaylandSurface    *surface);
+ 
++GQueue                 *meta_wayland_compositor_get_transactions (MetaWaylandCompositor *compositor);
++
+ META_EXPORT_TEST
+ const char             *meta_wayland_get_wayland_display_name   (MetaWaylandCompositor *compositor);
+ 
+diff --git a/src/wayland/meta-window-wayland.c b/src/wayland/meta-window-wayland.c
+index 31e0ef103..a794b82a9 100644
+--- a/src/wayland/meta-window-wayland.c
++++ b/src/wayland/meta-window-wayland.c
+@@ -148,6 +148,9 @@ meta_window_wayland_kill (MetaWindow *window)
+   MetaWaylandSurface *surface = window->surface;
+   struct wl_resource *resource = surface->resource;
+ 
++  if (!resource)
++    return;
++
+   /* Send the client an unrecoverable error to kill the client. */
+   wl_resource_post_error (resource,
+                           WL_DISPLAY_ERROR_NO_MEMORY,
+@@ -621,6 +624,9 @@ meta_window_wayland_get_client_pid (MetaWindow *window)
+   struct wl_resource *resource = surface->resource;
+   pid_t pid;
+ 
++  if (!resource)
++    return 0;
++
+   wl_client_get_credentials (wl_resource_get_client (resource), &pid, NULL, NULL);
+   return pid;
+ }
+diff --git a/src/wayland/meta-xwayland.c b/src/wayland/meta-xwayland.c
+index c5a9303df..00d79b9c6 100644
+--- a/src/wayland/meta-xwayland.c
++++ b/src/wayland/meta-xwayland.c
+@@ -135,7 +135,8 @@ meta_xwayland_is_xwayland_surface (MetaWaylandSurface *surface)
+   MetaWaylandCompositor *compositor = meta_wayland_compositor_get_default ();
+   MetaXWaylandManager *manager = &compositor->xwayland_manager;
+ 
+-  return wl_resource_get_client (surface->resource) == manager->client;
++  return surface->resource != NULL &&
++    wl_resource_get_client (surface->resource) == manager->client;
+ }
+ 
+ static char *
