@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       40.4
-Release:       101%{?dist}
+Release:       102%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -40,6 +40,7 @@ Patch8:        max-rects.diff
 
 # Defer applying state updates until dma-buf file descriptors are readable
 Patch9:        1880-rebased.diff
+Patch10:       fix-1892.diff
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -188,6 +189,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Sep 09 2021 Grigori Goronzy <greg@kinoho.net> - 40.4-102
+- Add fix for #1892 picked from !1958
+
 * Wed Sep 08 2021 Grigori Goronzy <greg@kinoho.net> - 40.4-101
 - Add !1880
 
