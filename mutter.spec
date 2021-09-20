@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       41.0
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -118,6 +118,8 @@ behaviors to meet the needs of the environment.
 %package devel
 Summary: Development package for %{name}
 Requires: %{name}%{?_isa} = %{version}-%{release}
+# for EGL/eglmesaext.h that's included from public cogl-egl-defines.h header
+Requires: mesa-libEGL-devel
 
 %description devel
 Header files and libraries for developing Mutter plugins. Also includes
@@ -172,6 +174,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Sep 20 2021 Kalev Lember <klember@redhat.com> - 41.0-2
+- Add missing mesa-libEGL-devel dep to mutter-devel (#2002441)
+
 * Sun Sep 19 2021 Florian Müllner <fmuellner@redhat.com> - 41.0-1
 - Update to 41.0
 
