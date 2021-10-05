@@ -1,0 +1,29 @@
+From 9179d4a4b1708a769d09d0d31d9af5d82240492c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Tue, 5 Oct 2021 15:17:17 +0200
+Subject: [PATCH] kms/impl-device/atomic: Add virtio_gpu to deny list
+
+virtio_gpu is used in virtual machine environments, meaning they need
+accurate cursor hotspots, which currently needs non-atomic mode setting.
+
+Related: https://bugzilla.redhat.com/show_bug.cgi?id=2009304
+Part-of: <https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2040>
+---
+ src/backends/native/meta-kms-impl-device-atomic.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/backends/native/meta-kms-impl-device-atomic.c b/src/backends/native/meta-kms-impl-device-atomic.c
+index 674a24902b..e1adf20b3c 100644
+--- a/src/backends/native/meta-kms-impl-device-atomic.c
++++ b/src/backends/native/meta-kms-impl-device-atomic.c
+@@ -1150,6 +1150,7 @@ is_atomic_allowed (const char *driver_name)
+     "vboxvideo",
+     "nvidia-drm",
+     "tegra",
++    "virtio_gpu",
+     NULL,
+   };
+ 
+-- 
+2.32.0
+
