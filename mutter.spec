@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       40.4
-Release:       102%{?dist}
+Version:       40.5
+Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -26,6 +26,12 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 
+# Block atomic mode setting on virtio to fix cursor offset
+# backported to GNOME 40 branch, rediffed on tegra patch
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2040
+# https://bugzilla.redhat.com/show_bug.cgi?id=2009304
+Patch3:        0001-kms-device-Add-virtio_gpu-to-deny-list.patch
+
 # Enable RT priority by default
 Patch4:        rt-default.diff
 
@@ -40,7 +46,6 @@ Patch8:        max-rects.diff
 
 # Defer applying state updates until dma-buf file descriptors are readable
 Patch9:        1880-rebased.diff
-Patch10:       fix-1892.diff
 
 BuildRequires: chrpath
 BuildRequires: pango-devel
@@ -189,6 +194,16 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sun Oct 10 2021 Grigori Goronzy <greg@kinoho.net> - 40.5-100
+- Merge upstream
+- Remove fix for #1892 (applied upstream)
+
+* Tue Oct 05 2021 Adam Williamson <awilliam@redhat.com> - 40.5-2
+- Backport MR #2040 to fix cursor offset in VMs (#2009304)
+
+* Tue Sep 21 2021 Florian Müllner <fmuellner@redhat.com> - 40.5-1
+- Update to 40.5
+
 * Thu Sep 09 2021 Grigori Goronzy <greg@kinoho.net> - 40.4-102
 - Add fix for #1892 picked from !1958
 
