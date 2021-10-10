@@ -1,5 +1,5 @@
 diff --git a/src/compositor/meta-window-actor-wayland.c b/src/compositor/meta-window-actor-wayland.c
-index b1fe61641..91ce1d936 100644
+index 641c924db..2af16a0b9 100644
 --- a/src/compositor/meta-window-actor-wayland.c
 +++ b/src/compositor/meta-window-actor-wayland.c
 @@ -73,7 +73,7 @@ meta_window_actor_wayland_rebuild_surface_tree (MetaWindowActor *actor)
@@ -333,10 +333,10 @@ index cdc65aeb5..fc5ec41d2 100644
  meta_wayland_dma_buf_try_acquire_scanout (MetaWaylandDmaBufBuffer *dma_buf,
                                            CoglOnscreen            *onscreen);
 diff --git a/src/wayland/meta-wayland-legacy-xdg-shell.c b/src/wayland/meta-wayland-legacy-xdg-shell.c
-index 6dc8cc402..2e20003b0 100644
+index 3c1ed8e93..965a6d4d5 100644
 --- a/src/wayland/meta-wayland-legacy-xdg-shell.c
 +++ b/src/wayland/meta-wayland-legacy-xdg-shell.c
-@@ -751,7 +751,7 @@ meta_wayland_zxdg_toplevel_v6_post_apply_state (MetaWaylandSurfaceRole  *surface
+@@ -748,7 +748,7 @@ meta_wayland_zxdg_toplevel_v6_post_apply_state (MetaWaylandSurfaceRole  *surface
  
            meta_window_recalc_features (window);
          }
@@ -345,7 +345,7 @@ index 6dc8cc402..2e20003b0 100644
          {
            wl_resource_post_error (surface->resource,
                                    ZXDG_SHELL_V6_ERROR_INVALID_SURFACE_STATE,
-@@ -1390,17 +1390,23 @@ meta_wayland_zxdg_surface_v6_apply_state (MetaWaylandSurfaceRole  *surface_role,
+@@ -1384,17 +1384,23 @@ meta_wayland_zxdg_surface_v6_apply_state (MetaWaylandSurfaceRole  *surface_role,
    if (!surface->buffer_ref->buffer && priv->first_buffer_attached)
      {
        /* XDG surfaces can't commit NULL buffers */
@@ -375,7 +375,7 @@ index 6dc8cc402..2e20003b0 100644
        return;
      }
  
-@@ -1464,10 +1470,13 @@ meta_wayland_zxdg_surface_v6_assigned (MetaWaylandSurfaceRole *surface_role)
+@@ -1458,10 +1464,13 @@ meta_wayland_zxdg_surface_v6_assigned (MetaWaylandSurfaceRole *surface_role)
  
    if (surface->buffer_ref->buffer)
      {
@@ -605,7 +605,7 @@ index 5e052e000..89f5d77a3 100644
        MetaWaylandSubsurface *subsurface;
  
 diff --git a/src/wayland/meta-wayland-subsurface.c b/src/wayland/meta-wayland-subsurface.c
-index d7f56b66e..d2fbf1afb 100644
+index 7e996f4d3..852c9d99b 100644
 --- a/src/wayland/meta-wayland-subsurface.c
 +++ b/src/wayland/meta-wayland-subsurface.c
 @@ -28,6 +28,7 @@
@@ -760,7 +760,7 @@ index d7f56b66e..d2fbf1afb 100644
    surface_role_class->notify_subsurface_state_changed =
      meta_wayland_subsurface_notify_subsurface_state_changed;
  
-@@ -292,37 +265,6 @@ meta_wayland_subsurface_class_init (MetaWaylandSubsurfaceClass *klass)
+@@ -292,38 +265,6 @@ meta_wayland_subsurface_class_init (MetaWaylandSubsurfaceClass *klass)
      meta_wayland_subsurface_sync_actor_state;
  }
  
@@ -775,7 +775,8 @@ index d7f56b66e..d2fbf1afb 100644
 -    return;
 -
 -  parent_actor = clutter_actor_get_parent (actor);
--  clutter_actor_remove_child (parent_actor, actor);
+-  if (parent_actor)
+-    clutter_actor_remove_child (parent_actor, actor);
 -}
 -
 -static void
@@ -798,7 +799,7 @@ index d7f56b66e..d2fbf1afb 100644
  static void
  wl_subsurface_destroy (struct wl_client   *client,
                         struct wl_resource *resource)
-@@ -337,10 +279,10 @@ wl_subsurface_set_position (struct wl_client   *client,
+@@ -338,10 +279,10 @@ wl_subsurface_set_position (struct wl_client   *client,
                              int32_t             y)
  {
    MetaWaylandSurface *surface = wl_resource_get_user_data (resource);
@@ -812,7 +813,7 @@ index d7f56b66e..d2fbf1afb 100644
  }
  
  static gboolean
-@@ -361,6 +303,7 @@ subsurface_handle_pending_subsurface_destroyed (struct wl_listener *listener,
+@@ -362,6 +303,7 @@ subsurface_handle_pending_subsurface_destroyed (struct wl_listener *listener,
    MetaWaylandSubsurfacePlacementOp *op =
      wl_container_of (listener, op, subsurface_destroy_listener);
  
@@ -820,7 +821,7 @@ index d7f56b66e..d2fbf1afb 100644
    op->surface = NULL;
  }
  
-@@ -371,16 +314,21 @@ subsurface_handle_pending_sibling_destroyed (struct wl_listener *listener,
+@@ -372,16 +314,21 @@ subsurface_handle_pending_sibling_destroyed (struct wl_listener *listener,
    MetaWaylandSubsurfacePlacementOp *op =
      wl_container_of (listener, op, sibling_destroy_listener);
  
@@ -846,7 +847,7 @@ index d7f56b66e..d2fbf1afb 100644
    g_free (op);
  }
  
-@@ -389,13 +337,30 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
+@@ -390,13 +337,30 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
                              MetaWaylandSurface             *sibling,
                              MetaWaylandSubsurfacePlacement  placement)
  {
@@ -878,7 +879,7 @@ index d7f56b66e..d2fbf1afb 100644
    op->subsurface_destroy_listener.notify =
      subsurface_handle_pending_subsurface_destroyed;
    op->sibling_destroy_listener.notify =
-@@ -405,8 +370,24 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
+@@ -406,8 +370,24 @@ queue_subsurface_placement (MetaWaylandSurface             *surface,
    wl_resource_add_destroy_listener (sibling->resource,
                                      &op->sibling_destroy_listener);
  
@@ -905,7 +906,7 @@ index d7f56b66e..d2fbf1afb 100644
  }
  
  static void
-@@ -453,6 +434,24 @@ wl_subsurface_place_below (struct wl_client   *client,
+@@ -454,6 +434,24 @@ wl_subsurface_place_below (struct wl_client   *client,
                                META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW);
  }
  
@@ -930,7 +931,7 @@ index d7f56b66e..d2fbf1afb 100644
  static void
  wl_subsurface_set_sync (struct wl_client   *client,
                          struct wl_resource *resource)
-@@ -462,19 +461,37 @@ wl_subsurface_set_sync (struct wl_client   *client,
+@@ -463,19 +461,37 @@ wl_subsurface_set_sync (struct wl_client   *client,
    surface->sub.synchronous = TRUE;
  }
  
@@ -973,18 +974,20 @@ index d7f56b66e..d2fbf1afb 100644
  }
  
  static const struct wl_subsurface_interface meta_wayland_wl_subsurface_interface = {
-@@ -501,7 +518,9 @@ surface_handle_parent_surface_destroyed (struct wl_listener *listener,
+@@ -502,8 +518,10 @@ surface_handle_parent_surface_destroyed (struct wl_listener *listener,
                                                   surface,
                                                   sub.parent_destroy_listener);
  
+-  g_node_unlink (surface->subsurface_branch_node);
 -  surface->sub.parent = NULL;
 +  queue_subsurface_placement (surface, NULL,
 +                              META_WAYLAND_SUBSURFACE_PLACEMENT_BELOW);
++  g_node_unlink (surface->protocol.subsurface_branch_node);
 +  surface->protocol.parent = NULL;
  }
  
  static gboolean
-@@ -510,8 +529,8 @@ is_same_or_ancestor (MetaWaylandSurface *surface,
+@@ -512,8 +530,8 @@ is_same_or_ancestor (MetaWaylandSurface *surface,
  {
    if (surface == other_surface)
      return TRUE;
@@ -995,7 +998,7 @@ index d7f56b66e..d2fbf1afb 100644
    return FALSE;
  }
  
-@@ -570,16 +589,14 @@ wl_subcompositor_get_subsurface (struct wl_client   *client,
+@@ -572,16 +590,14 @@ wl_subcompositor_get_subsurface (struct wl_client   *client,
                                    wl_subsurface_destructor);
  
    surface->sub.synchronous = TRUE;
@@ -1036,7 +1039,7 @@ index 45dbf8626..e209e824d 100644
                                               int                    parent_x,
                                               int                    parent_y,
 diff --git a/src/wayland/meta-wayland-surface.c b/src/wayland/meta-wayland-surface.c
-index 8dbf3a750..1225dc5c6 100644
+index e39479f26..28bebff97 100644
 --- a/src/wayland/meta-wayland-surface.c
 +++ b/src/wayland/meta-wayland-surface.c
 @@ -51,6 +51,7 @@
@@ -1381,7 +1384,7 @@ index 8dbf3a750..1225dc5c6 100644
    for (iter = wayland_output->resources; iter != NULL; iter = iter->next)
      {
        resource = iter->data;
-@@ -1426,9 +1452,9 @@ unlink_note (GNode    *node,
+@@ -1419,9 +1445,9 @@ meta_wayland_surface_notify_unmapped (MetaWaylandSurface *surface)
  }
  
  static void
@@ -1393,7 +1396,7 @@ index 8dbf3a750..1225dc5c6 100644
    MetaWaylandCompositor *compositor = surface->compositor;
    MetaWaylandFrameCallback *cb, *next;
  
-@@ -1447,9 +1473,6 @@ wl_surface_destructor (struct wl_resource *resource)
+@@ -1440,9 +1466,6 @@ wl_surface_destructor (struct wl_resource *resource)
    g_clear_pointer (&surface->texture, cogl_object_unref);
    g_clear_pointer (&surface->buffer_ref, meta_wayland_buffer_ref_unref);
  
@@ -1403,18 +1406,11 @@ index 8dbf3a750..1225dc5c6 100644
    if (surface->opaque_region)
      cairo_region_destroy (surface->opaque_region);
    if (surface->input_region)
-@@ -1471,22 +1494,50 @@ wl_surface_destructor (struct wl_resource *resource)
+@@ -1464,15 +1487,36 @@ wl_surface_destructor (struct wl_resource *resource)
  
    meta_wayland_surface_discard_presentation_feedback (surface);
  
-+  if (surface->output.subsurface_branch_node)
-+    {
-+      g_node_children_foreach (surface->output.subsurface_branch_node,
-+                               G_TRAVERSE_NON_LEAVES,
-+                               unlink_note,
-+                               NULL);
-+      g_clear_pointer (&surface->output.subsurface_branch_node, g_node_destroy);
-+    }
++  g_clear_pointer (&surface->output.subsurface_branch_node, g_node_destroy);
 +
 +  g_hash_table_destroy (surface->shortcut_inhibited_seats);
 +
@@ -1439,17 +1435,8 @@ index 8dbf3a750..1225dc5c6 100644
    if (surface->wl_subsurface)
      wl_resource_destroy (surface->wl_subsurface);
  
--  if (surface->subsurface_branch_node)
-+  if (surface->protocol.subsurface_branch_node)
-     {
--      g_node_children_foreach (surface->subsurface_branch_node,
-+      g_node_children_foreach (surface->protocol.subsurface_branch_node,
-                                G_TRAVERSE_NON_LEAVES,
-                                unlink_note,
-                                NULL);
--      g_clear_pointer (&surface->subsurface_branch_node, g_node_destroy);
-+      g_clear_pointer (&surface->protocol.subsurface_branch_node, g_node_destroy);
-     }
+-  g_clear_pointer (&surface->subsurface_branch_node, g_node_destroy);
++  g_clear_pointer (&surface->protocol.subsurface_branch_node, g_node_destroy);
  
 -  g_hash_table_destroy (surface->shortcut_inhibited_seats);
 +  transaction = meta_wayland_surface_ensure_transaction (surface);
@@ -1459,7 +1446,7 @@ index 8dbf3a750..1225dc5c6 100644
  
    g_object_unref (surface);
  }
-@@ -1720,9 +1771,13 @@ meta_wayland_surface_init (MetaWaylandSurface *surface)
+@@ -1706,9 +1750,13 @@ meta_wayland_surface_init (MetaWaylandSurface *surface)
  
    surface->buffer_ref = meta_wayland_buffer_ref_new ();
  
@@ -1476,7 +1463,7 @@ index 8dbf3a750..1225dc5c6 100644
  }
  
  static void
-@@ -1730,6 +1785,8 @@ meta_wayland_surface_class_init (MetaWaylandSurfaceClass *klass)
+@@ -1716,6 +1764,8 @@ meta_wayland_surface_class_init (MetaWaylandSurfaceClass *klass)
  {
    GObjectClass *object_class = G_OBJECT_CLASS (klass);
  
@@ -1485,7 +1472,7 @@ index 8dbf3a750..1225dc5c6 100644
    surface_signals[SURFACE_DESTROY] =
      g_signal_new ("destroy",
                    G_TYPE_FROM_CLASS (object_class),
-@@ -1935,24 +1992,24 @@ meta_wayland_surface_get_window (MetaWaylandSurface *surface)
+@@ -1921,24 +1971,24 @@ meta_wayland_surface_get_window (MetaWaylandSurface *surface)
  }
  
  static gboolean
@@ -2313,10 +2300,10 @@ index 00712ad1f..3a356d3b7 100644
  
  typedef struct _MetaWaylandWindowConfiguration MetaWaylandWindowConfiguration;
 diff --git a/src/wayland/meta-wayland-xdg-shell.c b/src/wayland/meta-wayland-xdg-shell.c
-index 5548e558c..529c1b246 100644
+index c5f0d0b91..e0d76c8fa 100644
 --- a/src/wayland/meta-wayland-xdg-shell.c
 +++ b/src/wayland/meta-wayland-xdg-shell.c
-@@ -845,9 +845,12 @@ meta_wayland_xdg_toplevel_post_apply_state (MetaWaylandSurfaceRole  *surface_rol
+@@ -842,9 +842,12 @@ meta_wayland_xdg_toplevel_post_apply_state (MetaWaylandSurfaceRole  *surface_rol
          }
        else
          {
@@ -2388,7 +2375,7 @@ index 6c655e427..be1d07c17 100644
  const char             *meta_wayland_get_wayland_display_name   (MetaWaylandCompositor *compositor);
  
 diff --git a/src/wayland/meta-window-wayland.c b/src/wayland/meta-window-wayland.c
-index 31e0ef103..a794b82a9 100644
+index 12e9567d9..7a0d94e38 100644
 --- a/src/wayland/meta-window-wayland.c
 +++ b/src/wayland/meta-window-wayland.c
 @@ -148,6 +148,9 @@ meta_window_wayland_kill (MetaWindow *window)
@@ -2401,7 +2388,7 @@ index 31e0ef103..a794b82a9 100644
    /* Send the client an unrecoverable error to kill the client. */
    wl_resource_post_error (resource,
                            WL_DISPLAY_ERROR_NO_MEMORY,
-@@ -621,6 +624,9 @@ meta_window_wayland_get_client_pid (MetaWindow *window)
+@@ -610,6 +613,9 @@ meta_window_wayland_get_client_pid (MetaWindow *window)
    struct wl_resource *resource = surface->resource;
    pid_t pid;
  
