@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       41.0
-Release:       3%{?dist}
+Release:       4%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -31,6 +31,12 @@ Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
 # https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2040
 # https://bugzilla.redhat.com/show_bug.cgi?id=2009304
 Patch3:        0001-kms-impl-device-atomic-Add-virtio_gpu-to-deny-list.patch
+
+# Only reset preedit text if set
+# Fixes cursor jumping around like a demented bunny in text editors
+# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/4647
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2059
+Patch4:        0001-clutter-Only-reset-preedit-text-if-set.patch
 
 BuildRequires: pango-devel
 BuildRequires: startup-notification-devel
@@ -180,6 +186,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Oct 25 2021 Adam Williamson <awilliam@redhat.com> - 41.0-4
+- Backport MR #2059 to fix cursor jumping around in text editors (#2017192)
+
 * Tue Oct 05 2021 Adam Williamson <awilliam@redhat.com> - 41.0-3
 - Backport MR #2040 to fix cursor offset in VMs (#2009304)
 
