@@ -1,0 +1,45 @@
+From 3b6f9111c7da3fee82d3ffd19c444155f84d86ea Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Tue, 19 Oct 2021 16:53:13 +0200
+Subject: [PATCH] clutter: Only reset preedit text if set
+
+On ClutterInputFocus::reset, avoid to unset the preedit text if
+none was set earlier. This seems to trick GTK clients into focusing
+the cursor position again, even when we are moving away from it.
+
+Fixes: https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/4647
+Part-of: <https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2059>
+---
+ clutter/clutter/clutter-input-focus.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/clutter/clutter/clutter-input-focus.c b/clutter/clutter/clutter-input-focus.c
+index c22e3a32c0..117bab72ce 100644
+--- a/clutter/clutter/clutter-input-focus.c
++++ b/clutter/clutter/clutter-input-focus.c
+@@ -103,14 +103,16 @@ clutter_input_focus_reset (ClutterInputFocus *focus)
+ 
+   priv = clutter_input_focus_get_instance_private (focus);
+ 
+-  if (priv->preedit &&
+-      priv->mode == CLUTTER_PREEDIT_RESET_COMMIT)
+-    clutter_input_focus_commit (focus, priv->preedit);
++  if (priv->preedit)
++    {
++      if (priv->mode == CLUTTER_PREEDIT_RESET_COMMIT)
++        clutter_input_focus_commit (focus, priv->preedit);
+ 
+-  clutter_input_focus_set_preedit_text (focus, NULL, 0);
+-  g_clear_pointer (&priv->preedit, g_free);
+-  priv->mode = CLUTTER_PREEDIT_RESET_CLEAR;
++      clutter_input_focus_set_preedit_text (focus, NULL, 0);
++      g_clear_pointer (&priv->preedit, g_free);
++    }
+ 
++  priv->mode = CLUTTER_PREEDIT_RESET_CLEAR;
+   clutter_input_method_reset (priv->im);
+ }
+ 
+-- 
+2.33.0
+
