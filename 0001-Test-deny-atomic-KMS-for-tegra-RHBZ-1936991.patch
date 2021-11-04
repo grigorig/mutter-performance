@@ -1,12 +1,12 @@
-From 9d0ded3178777cd6afcdd5fff7b6f0f39a0d5236 Mon Sep 17 00:00:00 2001
+From 8134db4a14353a5fe9f91ceeaf5e0972822aec6f Mon Sep 17 00:00:00 2001
 From: Adam Williamson <awilliam@redhat.com>
 Date: Tue, 9 Mar 2021 17:21:59 -0800
 Subject: [PATCH] Test: deny atomic KMS for "tegra" (RHBZ #1936991)
 
 Signed-off-by: Adam Williamson <awilliam@redhat.com>
 ---
- data/61-mutter.rules                  | 1 +
- src/backends/native/meta-kms-device.c | 1 +
+ data/61-mutter.rules                              | 1 +
+ src/backends/native/meta-kms-impl-device-atomic.c | 1 +
  2 files changed, 2 insertions(+)
 
 diff --git a/data/61-mutter.rules b/data/61-mutter.rules
@@ -18,11 +18,11 @@ index edc03e6c1..d8e3c5f00 100644
  DRIVERS=="radeon", SUBSYSTEM=="drm", TAG+="mutter-device-disable-kms-modifiers"
  ENV{ID_PATH}=="platform-vkms", TAG+="mutter-device-ignore"
 +DRIVER=="tegra", SUBSYSTEM=="platform", TAG+="mutter-device-disable-atomic-kms"
-diff --git a/src/backends/native/meta-kms-device.c b/src/backends/native/meta-kms-device.c
-index 85aded9a6..e749ab6b9 100644
---- a/src/backends/native/meta-kms-device.c
-+++ b/src/backends/native/meta-kms-device.c
-@@ -253,6 +253,7 @@ is_atomic_allowed (const char *driver_name)
+diff --git a/src/backends/native/meta-kms-impl-device-atomic.c b/src/backends/native/meta-kms-impl-device-atomic.c
+index e1adf20b3..681be42a8 100644
+--- a/src/backends/native/meta-kms-impl-device-atomic.c
++++ b/src/backends/native/meta-kms-impl-device-atomic.c
+@@ -1151,6 +1151,7 @@ is_atomic_allowed (const char *driver_name)
      "vboxvideo",
      "nvidia-drm",
      "virtio_gpu",
