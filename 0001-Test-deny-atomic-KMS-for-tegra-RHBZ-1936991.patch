@@ -1,4 +1,4 @@
-From ac7f1c64e3b12ba74e5138805e334016b40e6629 Mon Sep 17 00:00:00 2001
+From 9d0ded3178777cd6afcdd5fff7b6f0f39a0d5236 Mon Sep 17 00:00:00 2001
 From: Adam Williamson <awilliam@redhat.com>
 Date: Tue, 9 Mar 2021 17:21:59 -0800
 Subject: [PATCH] Test: deny atomic KMS for "tegra" (RHBZ #1936991)
@@ -19,17 +19,17 @@ index edc03e6c1..d8e3c5f00 100644
  ENV{ID_PATH}=="platform-vkms", TAG+="mutter-device-ignore"
 +DRIVER=="tegra", SUBSYSTEM=="platform", TAG+="mutter-device-disable-atomic-kms"
 diff --git a/src/backends/native/meta-kms-device.c b/src/backends/native/meta-kms-device.c
-index c388096d5..ef65cf82b 100644
+index 85aded9a6..e749ab6b9 100644
 --- a/src/backends/native/meta-kms-device.c
 +++ b/src/backends/native/meta-kms-device.c
-@@ -252,6 +252,7 @@ is_atomic_allowed (const char *driver_name)
-     "vmwgfx",
+@@ -253,6 +253,7 @@ is_atomic_allowed (const char *driver_name)
      "vboxvideo",
      "nvidia-drm",
+     "virtio_gpu",
 +    "tegra",
      NULL,
    };
  
 -- 
-2.31.1
+2.32.0
 
