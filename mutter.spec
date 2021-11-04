@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       41.0
-Release:       4%{?dist}
+Version:       41.1
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,18 +25,6 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
-
-# Block atomic mode setting on virtio to fix cursor offset
-# manually re-diffed on top of "tegra" patch above
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2040
-# https://bugzilla.redhat.com/show_bug.cgi?id=2009304
-Patch3:        0001-kms-impl-device-atomic-Add-virtio_gpu-to-deny-list.patch
-
-# Only reset preedit text if set
-# Fixes cursor jumping around like a demented bunny in text editors
-# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/4647
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2059
-Patch4:        0001-clutter-Only-reset-preedit-text-if-set.patch
 
 BuildRequires: pango-devel
 BuildRequires: startup-notification-devel
@@ -186,6 +174,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Nov 04 2021 Florian Müllner <fmuellner@redhat.com> - 41.1-1
+- Update to 41.1
+
 * Mon Oct 25 2021 Adam Williamson <awilliam@redhat.com> - 41.0-4
 - Backport MR #2059 to fix cursor jumping around in text editors (#2017192)
 
