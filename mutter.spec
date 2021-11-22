@@ -33,7 +33,7 @@ Patch4:        rt-default.diff
 Patch6:        1810.diff
 
 # Latency reduction
-Patch7:        1762.diff
+# Patch7:        1762.diff
 
 # Increase max number of opaque region rects
 Patch8:        max-rects.diff
