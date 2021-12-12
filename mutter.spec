@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       41.1
-Release:       100%{?dist}
+Release:       101%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,6 +25,9 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
 Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
+
+# Patches that landed upstream after 41.1
+Patch3:        patches-atfer-41.1.patch
 
 # Increase max opaque rects
 Patch4:        max-rects.diff
@@ -177,6 +180,12 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sun Dec 12 2021 Grigori Goronzy <greg@kinoho.net> - 41.1-101
+- Merge upstream
+
+* Fri Dec 10 2021 Jonas Ådahl <jadahl@redhat.com> - 41.1-2
+- Backport patches after 41.1
+
 * Sun Dec 05 2021 Grigori Goronzy <greg@kinoho.net> - 41.1-100
 - Add performance patches
 
