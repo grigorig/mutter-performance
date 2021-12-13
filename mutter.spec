@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       41.0
-Release:       4%{?dist}
+Release:       5%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -186,6 +186,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Dec 13 2021 Peter Hutterer <peter.hutterer@redhat.com> - 41.0-5
+- Rebuild for libwacom soname bump
+
 * Mon Oct 25 2021 Adam Williamson <awilliam@redhat.com> - 41.0-4
 - Backport MR #2059 to fix cursor jumping around in text editors (#2017192)
 
