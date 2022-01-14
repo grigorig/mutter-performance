@@ -26,23 +26,23 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=1936991
 Patch2:        mutter-42.alpha-disable-tegra.patch
 
-BuildRequires: gobject-introspection-devel >= 1.41.0
-BuildRequires: libSM-devel
-BuildRequires: libwacom-devel
-BuildRequires: libX11-devel
-BuildRequires: libXdamage-devel
-BuildRequires: libXext-devel
-BuildRequires: libXfixes-devel
-BuildRequires: libXi-devel
-BuildRequires: libXrandr-devel
-BuildRequires: libXrender-devel
-BuildRequires: libXcursor-devel
-BuildRequires: libXcomposite-devel
-BuildRequires: libxcb-devel
-BuildRequires: libxkbcommon-devel
-BuildRequires: libxkbcommon-x11-devel
-BuildRequires: libxkbfile-devel
-BuildRequires: libXtst-devel
+BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
+BuildRequires: pkgconfig(sm)
+BuildRequires: pkgconfig(libwacom)
+BuildRequires: pkgconfig(x11)
+BuildRequires: pkgconfig(xdamage)
+BuildRequires: pkgconfig(xext)
+BuildRequires: pkgconfig(xfixes)
+BuildRequires: pkgconfig(xi)
+BuildRequires: pkgconfig(xrandr)
+BuildRequires: pkgconfig(xrender)
+BuildRequires: pkgconfig(xcursor)
+BuildRequires: pkgconfig(xcomposite)
+BuildRequires: pkgconfig(x11-xcb)
+BuildRequires: pkgconfig(xkbcommon)
+BuildRequires: pkgconfig(xkbcommon-x11)
+BuildRequires: pkgconfig(xkbfile)
+BuildRequires: pkgconfig(xtst)
 BuildRequires: mesa-libEGL-devel
 BuildRequires: mesa-libGLES-devel
 BuildRequires: mesa-libGL-devel
@@ -53,18 +53,17 @@ BuildRequires: pam-devel
 BuildRequires: pkgconfig(libpipewire-0.3) >= %{pipewire_version}
 BuildRequires: pkgconfig(sysprof-capture-4)
 BuildRequires: sysprof-devel
-BuildRequires: systemd-devel
-BuildRequires: upower-devel
+BuildRequires: pkgconfig(libsystemd)
 BuildRequires: xorg-x11-server-Xorg
 BuildRequires: xorg-x11-server-Xvfb
-BuildRequires: xkeyboard-config-devel
+BuildRequires: pkgconfig(xkeyboard-config)
 BuildRequires: zenity
 BuildRequires: desktop-file-utils
 # Bootstrap requirements
 BuildRequires: gtk-doc gettext-devel git-core
-BuildRequires: libcanberra-devel
-BuildRequires: gsettings-desktop-schemas-devel >= %{gsettings_desktop_schemas_version}
-BuildRequires: gnome-settings-daemon-devel
+BuildRequires: pkgconfig(libcanberra)
+BuildRequires: pkgconfig(gsettings-desktop-schemas) >= %{gsettings_desktop_schemas_version}
+BuildRequires: pkgconfig(gnome-settings-daemon)
 BuildRequires: meson
 BuildRequires: pkgconfig(gbm)
 BuildRequires: pkgconfig(gnome-desktop-3.0)
@@ -75,8 +74,8 @@ BuildRequires: pkgconfig(wayland-eglstream)
 BuildRequires: pkgconfig(wayland-protocols)
 BuildRequires: pkgconfig(wayland-server)
 
-BuildRequires: json-glib-devel >= %{json_glib_version}
-BuildRequires: libinput-devel >= %{libinput_version}
+BuildRequires: pkgconfig(json-glib-1.0) >= %{json_glib_version}
+BuildRequires: pkgconfig(libinput) >= %{libinput_version}
 BuildRequires: pkgconfig(xwayland)
 
 Requires: control-center-filesystem
@@ -172,6 +171,7 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %changelog
 * Fri Jan 14 2022 David King <amigadave@amigadave.com> - 42~alpha-1
 - Update to 42~alpha
+- Use pkgconfig for BuildRequires
 
 * Mon Dec 13 2021 Peter Hutterer <peter.hutterer@redhat.com> - 41.0-5
 - Rebuild for libwacom soname bump
