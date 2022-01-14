@@ -4,18 +4,18 @@
 %global json_glib_version 0.12.0
 %global libinput_version 1.4
 %global pipewire_version 0.3.0
-%global mutter_api_version 9
+%global mutter_api_version 10
 
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       41.0
-Release:       5%{?dist}
+Version:       42~alpha
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
 URL:           http://www.gnome.org
-Source0:       http://download.gnome.org/sources/%{name}/41/%{name}-%{tarball_version}.tar.xz
+Source0:       http://download.gnome.org/sources/%{name}/42/%{name}-%{tarball_version}.tar.xz
 
 # Work-around for OpenJDK's compliance test
 Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
@@ -23,27 +23,9 @@ Patch0:        0001-window-actor-Special-case-shaped-Java-windows.patch
 # To make s390x build pass
 Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
-# Workaround for RHBZ#1936991 (blocks atomic KMS on "tegra" driver)
-Patch2:        0001-Test-deny-atomic-KMS-for-tegra-RHBZ-1936991.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1936991
+Patch2:        mutter-42.alpha-disable-tegra.patch
 
-# Block atomic mode setting on virtio to fix cursor offset
-# manually re-diffed on top of "tegra" patch above
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2040
-# https://bugzilla.redhat.com/show_bug.cgi?id=2009304
-Patch3:        0001-kms-impl-device-atomic-Add-virtio_gpu-to-deny-list.patch
-
-# Only reset preedit text if set
-# Fixes cursor jumping around like a demented bunny in text editors
-# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/4647
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2059
-Patch4:        0001-clutter-Only-reset-preedit-text-if-set.patch
-
-BuildRequires: pango-devel
-BuildRequires: startup-notification-devel
-BuildRequires: gnome-desktop3-devel
-BuildRequires: glib2-devel >= %{glib_version}
-BuildRequires: gtk3-devel >= %{gtk3_version}
-BuildRequires: pkgconfig
 BuildRequires: gobject-introspection-devel >= 1.41.0
 BuildRequires: libSM-devel
 BuildRequires: libwacom-devel
@@ -84,14 +66,16 @@ BuildRequires: libcanberra-devel
 BuildRequires: gsettings-desktop-schemas-devel >= %{gsettings_desktop_schemas_version}
 BuildRequires: gnome-settings-daemon-devel
 BuildRequires: meson
+BuildRequires: pkgconfig(gbm)
+BuildRequires: pkgconfig(gnome-desktop-3.0)
 BuildRequires: pkgconfig(gudev-1.0)
 BuildRequires: pkgconfig(libdrm)
-BuildRequires: pkgconfig(gbm)
-BuildRequires: pkgconfig(wayland-server)
+BuildRequires: pkgconfig(libstartup-notification-1.0)
 BuildRequires: pkgconfig(wayland-eglstream)
+BuildRequires: pkgconfig(wayland-protocols)
+BuildRequires: pkgconfig(wayland-server)
 
 BuildRequires: json-glib-devel >= %{json_glib_version}
-BuildRequires: libgudev1-devel
 BuildRequires: libinput-devel >= %{libinput_version}
 BuildRequires: pkgconfig(xwayland)
 
@@ -186,6 +170,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Fri Jan 14 2022 David King <amigadave@amigadave.com> - 42~alpha-1
+- Update to 42~alpha
+
 * Mon Dec 13 2021 Peter Hutterer <peter.hutterer@redhat.com> - 41.0-5
 - Rebuild for libwacom soname bump
 
