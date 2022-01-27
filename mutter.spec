@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42~alpha
-Release:       2%{?dist}
+Release:       3%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,6 +25,16 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1936991
 Patch2:        mutter-42.alpha-disable-tegra.patch
+
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2257
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2117
+# Fixes a bug that caused clicking not to work in openQA tests sometimes
+Patch3:        0001-clutter-Do-not-check-redraw-area-for-pointer-repicks.patch
+
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2120
+# Fixes build with recent glibc. Upstream may not do exactly this but
+# it's good enough for a package build
+Patch4:        0002-Drop-CI-test-setup-that-needs-catchsegv.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -169,6 +179,10 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Jan 27 2022 Adam Williamson <awilliam@redhat.com> - 42~alpha-3
+- Drop a test setup to fix build with latest glibc (catchsegv removed)
+- Backport MR #2257 to fix clicks on burger menus failing in openQA
+
 * Thu Jan 20 2022 Fedora Release Engineering <releng@fedoraproject.org> - 42~alpha-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
 

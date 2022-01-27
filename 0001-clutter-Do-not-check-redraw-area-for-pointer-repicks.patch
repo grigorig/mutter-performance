@@ -1,0 +1,177 @@
+From dbfde95c5c7b4fb41e816b65d05d1ac20d59dd8a Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 26 Jan 2022 18:39:27 +0100
+Subject: [PATCH 1/2] clutter: Do not check redraw area for pointer repicks
+
+This looks like a relic of glReadPixels-based picking, the pointer
+might well be outside redrawn areas, yet still require a device
+update (e.g. in order to reflect the actor layout changes in the
+"clear area" info).
+
+Instead, always update all devices that are inside the view after
+relayouts, the tracking on the need for that update is now done
+on each ClutterStageView, instead of globally in the ClutterStage.
+
+This theoretically fixes situations where pointers might miss
+updating their "clear area" after the actor tree changed.
+
+Closes: https://gitlab.gnome.org/GNOME/mutter/-/issues/2117
+Part-of: <https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2257>
+---
+ clutter/clutter/clutter-stage-private.h      |  3 +-
+ clutter/clutter/clutter-stage-view-private.h |  2 +
+ clutter/clutter/clutter-stage-view.c         | 14 ++++++-
+ clutter/clutter/clutter-stage.c              | 39 ++++++++++++--------
+ 4 files changed, 41 insertions(+), 17 deletions(-)
+
+diff --git a/clutter/clutter/clutter-stage-private.h b/clutter/clutter/clutter-stage-private.h
+index 50502845bf..efa341cc19 100644
+--- a/clutter/clutter/clutter-stage-private.h
++++ b/clutter/clutter/clutter-stage-private.h
+@@ -75,7 +75,8 @@ void                _clutter_stage_maybe_setup_viewport  (ClutterStage
+                                                           ClutterStageView      *view);
+ void                clutter_stage_maybe_relayout         (ClutterActor          *stage);
+ void                clutter_stage_maybe_finish_queue_redraws (ClutterStage      *stage);
+-GSList *            clutter_stage_find_updated_devices   (ClutterStage          *stage);
++GSList *            clutter_stage_find_updated_devices   (ClutterStage          *stage,
++                                                          ClutterStageView      *view);
+ void                clutter_stage_update_devices         (ClutterStage          *stage,
+                                                           GSList                *devices);
+ void                clutter_stage_finish_layout          (ClutterStage          *stage);
+diff --git a/clutter/clutter/clutter-stage-view-private.h b/clutter/clutter/clutter-stage-view-private.h
+index 0a20d75b17..39d8601ea5 100644
+--- a/clutter/clutter/clutter-stage-view-private.h
++++ b/clutter/clutter/clutter-stage-view-private.h
+@@ -79,4 +79,6 @@ void clutter_stage_view_notify_presented (ClutterStageView *view,
+ CLUTTER_EXPORT
+ void clutter_stage_view_notify_ready (ClutterStageView *view);
+ 
++void clutter_stage_view_invalidate_input_devices (ClutterStageView *view);
++
+ #endif /* __CLUTTER_STAGE_VIEW_PRIVATE_H__ */
+diff --git a/clutter/clutter/clutter-stage-view.c b/clutter/clutter/clutter-stage-view.c
+index ea7f572480..8a82de71ed 100644
+--- a/clutter/clutter/clutter-stage-view.c
++++ b/clutter/clutter/clutter-stage-view.c
+@@ -93,6 +93,7 @@ typedef struct _ClutterStageViewPrivate
+ 
+   guint dirty_viewport   : 1;
+   guint dirty_projection : 1;
++  guint needs_update_devices : 1;
+ } ClutterStageViewPrivate;
+ 
+ G_DEFINE_TYPE_WITH_PRIVATE (ClutterStageView, clutter_stage_view, G_TYPE_OBJECT)
+@@ -1176,7 +1177,8 @@ handle_frame_clock_frame (ClutterFrameClock *frame_clock,
+ 
+   clutter_stage_finish_layout (stage);
+ 
+-  devices = clutter_stage_find_updated_devices (stage);
++  if (priv->needs_update_devices)
++    devices = clutter_stage_find_updated_devices (stage, view);
+ 
+   frame = CLUTTER_FRAME_INIT;
+ 
+@@ -1200,6 +1202,7 @@ handle_frame_clock_frame (ClutterFrameClock *frame_clock,
+   _clutter_stage_window_finish_frame (stage_window, view, &frame);
+ 
+   clutter_stage_update_devices (stage, devices);
++  priv->needs_update_devices = FALSE;
+ 
+   _clutter_run_repaint_functions (CLUTTER_REPAINT_FLAGS_POST_PAINT);
+   clutter_stage_emit_after_update (stage, view);
+@@ -1522,3 +1525,12 @@ clutter_stage_view_class_init (ClutterStageViewClass *klass)
+ 
+   g_object_class_install_properties (object_class, PROP_LAST, obj_props);
+ }
++
++void
++clutter_stage_view_invalidate_input_devices (ClutterStageView *view)
++{
++  ClutterStageViewPrivate *priv =
++    clutter_stage_view_get_instance_private (view);
++
++  priv->needs_update_devices = TRUE;
++}
+diff --git a/clutter/clutter/clutter-stage.c b/clutter/clutter/clutter-stage.c
+index 3ef7ba69eb..c791959016 100644
+--- a/clutter/clutter/clutter-stage.c
++++ b/clutter/clutter/clutter-stage.c
+@@ -127,7 +127,6 @@ struct _ClutterStagePrivate
+ 
+   int update_freeze_count;
+ 
+-  gboolean needs_update_devices;
+   gboolean pending_finish_queue_redraws;
+ 
+   GHashTable *pointer_devices;
+@@ -785,6 +784,19 @@ clutter_stage_dequeue_actor_relayout (ClutterStage *stage,
+     }
+ }
+ 
++static void
++clutter_stage_invalidate_views_devices (ClutterStage *stage)
++{
++  GList *l;
++
++  for (l = clutter_stage_peek_stage_views (stage); l; l = l->next)
++    {
++      ClutterStageView *view = l->data;
++
++      clutter_stage_view_invalidate_input_devices (view);
++    }
++}
++
+ void
+ clutter_stage_maybe_relayout (ClutterActor *actor)
+ {
+@@ -832,36 +844,33 @@ clutter_stage_maybe_relayout (ClutterActor *actor)
+   CLUTTER_NOTE (ACTOR, "<<< Completed recomputing layout of %d subtrees", count);
+ 
+   if (count)
+-    priv->needs_update_devices = TRUE;
++    clutter_stage_invalidate_views_devices (stage);
+ }
+ 
+ GSList *
+-clutter_stage_find_updated_devices (ClutterStage *stage)
++clutter_stage_find_updated_devices (ClutterStage     *stage,
++                                    ClutterStageView *view)
+ {
+   ClutterStagePrivate *priv = stage->priv;
+   GSList *updating = NULL;
+   GHashTableIter iter;
+   gpointer value;
+ 
+-  if (!priv->needs_update_devices)
+-    return NULL;
+-
+-  priv->needs_update_devices = FALSE;
+-
+   g_hash_table_iter_init (&iter, priv->pointer_devices);
+   while (g_hash_table_iter_next (&iter, NULL, &value))
+     {
+       PointerDeviceEntry *entry = value;
+-      ClutterStageView *view;
+-      const cairo_region_t *clip;
++      ClutterStageView *pointer_view;
+ 
+-      view = clutter_stage_get_view_at (stage, entry->coords.x, entry->coords.y);
+-      if (!view)
++      pointer_view = clutter_stage_get_view_at (stage,
++                                                entry->coords.x,
++                                                entry->coords.y);
++      if (!pointer_view)
++        continue;
++      if (pointer_view != view)
+         continue;
+ 
+-      clip = clutter_stage_view_peek_redraw_clip (view);
+-      if (!clip || cairo_region_contains_point (clip, entry->coords.x, entry->coords.y))
+-        updating = g_slist_prepend (updating, entry->device);
++      updating = g_slist_prepend (updating, entry->device);
+     }
+ 
+   return updating;
+-- 
+2.35.0.rc1
+
