@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42~rc
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,6 +25,12 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1936991
 Patch2:        mutter-42.alpha-disable-tegra.patch
+
+# Handle input devices with multiple capabilities properly
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2331
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2154
+# https://bugzilla.redhat.com/show_bug.cgi?id=2017043
+Patch3:        2331.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -169,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Mar 08 2022 Adam Williamson <awilliam@redhat.com> - 42~rc-2
+- Backport MR #2331 for input device capabilities (#2017043)
+
 * Mon Mar 07 2022 Florian Müllner <fmuellner@redhat.com> - 42~rc-1
 - Update to 42.rc
 
