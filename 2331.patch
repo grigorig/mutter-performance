@@ -1,7 +1,7 @@
 From 6141cc6684d158b6ef55903be0e99c68f9afc953 Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 16:58:41 +0100
-Subject: [PATCH 1/9] backends/native: Make function to determine
+Subject: [PATCH 01/10] backends/native: Make function to determine
  ClutterInputDeviceType private
 
 We do not need to open code the ClutterInputDeviceType fetching from a
@@ -103,7 +103,7 @@ GitLab
 From 350286d27ec698944b0412540f1c5a3a1e37d369 Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:03:31 +0100
-Subject: [PATCH 2/9] clutter: Add ClutterInputCapabilities flagset
+Subject: [PATCH 02/10] clutter: Add ClutterInputCapabilities flagset
 
 This will be a truer representation of input devices in the native
 backend, since a single device can have multiple capabilities.
@@ -150,7 +150,7 @@ GitLab
 From f7f2a154c349de3dcf4ba650b74753e76c534532 Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:04:40 +0100
-Subject: [PATCH 3/9] clutter: Add ClutterInputDevice::capabilities property
+Subject: [PATCH 03/10] clutter: Add ClutterInputDevice::capabilities property
 
 This is construct-only, and assigned by the backend.
 ---
@@ -267,7 +267,7 @@ GitLab
 From 89e716113e3e08f7a87fdcfd9a7e166e82c4ffee Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:05:44 +0100
-Subject: [PATCH 4/9] backends/native: Assign capabilities to input devices
+Subject: [PATCH 04/10] backends/native: Assign capabilities to input devices
 
 These are extracted from the individual libinput_devices.
 ---
@@ -338,8 +338,8 @@ GitLab
 From 5e34d70cf412af934c3f5bc4c3ce86e2b6b3119a Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:12:42 +0100
-Subject: [PATCH 5/9] clutter: Add compatibility code to get input capabilities
- from device type
+Subject: [PATCH 05/10] clutter: Add compatibility code to get input
+ capabilities from device type
 
 We not just have X11 devices, but also virtual devices on both backends.
 So far have those specify a ClutterInputDeviceType, but transform that into
@@ -421,7 +421,7 @@ GitLab
 From f25f927763fa6c04898951a9c0a63a11213d7d50 Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:26:43 +0100
-Subject: [PATCH 6/9] wayland: Set wayland seat capabilities based on input
+Subject: [PATCH 06/10] wayland: Set wayland seat capabilities based on input
  device capabilities
 
 Instead of looking at device types, which might be incomplete.
@@ -530,7 +530,8 @@ GitLab
 From 79f463e110bc9efaa113e60231f59c22ed05db7c Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:31:20 +0100
-Subject: [PATCH 7/9] wayland: Check input device capabilities in tablet seats
+Subject: [PATCH 07/10] wayland: Check input device capabilities in tablet
+ seats
 
 Instead of looking for tablets and pads based on input device type,
 check capabilities.
@@ -656,7 +657,7 @@ GitLab
 From 34de2bfca2102990f8325341f0bd932cfe0b6b6e Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 17:51:40 +0100
-Subject: [PATCH 8/9] backends: Update MetaInputSettings to apply settings
+Subject: [PATCH 08/10] backends: Update MetaInputSettings to apply settings
  based on capabilities
 
 Since devices may be multiple things now, check all capabilities in order
@@ -1306,7 +1307,7 @@ GitLab
 From e7bee31884b9adf0ab71d0a010a3ef426351e97a Mon Sep 17 00:00:00 2001
 From: Carlos Garnacho <carlosg@gnome.org>
 Date: Tue, 8 Mar 2022 18:17:56 +0100
-Subject: [PATCH 9/9] core: Port to input device capabilities in pad mapper
+Subject: [PATCH 09/10] core: Port to input device capabilities in pad mapper
 
 Check for tablets and pad devices using capabilities.
 ---
@@ -1360,6 +1361,97 @@ index d80878304e..dc43924b55 100644
 +                         CLUTTER_INPUT_CAPABILITY_TABLET_PAD) != 0, NULL);
  
    group = clutter_input_device_get_mode_switch_button_group (pad, button);
+ 
+-- 
+GitLab
+
+
+From 8e27195bebd90c6aba2e669f4c3e7da8eb1e78aa Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 9 Mar 2022 12:19:20 +0100
+Subject: [PATCH 10/10] backends: Set mapping function for left-handed setting
+
+We have separate left-handed settings for mice and touchpads,
+which are slightly harder to be kept separate querying devices
+by capabilities. These should just relate if the "follow mouse"
+handedness is set on touchpads.
+
+In order to keep applying the setting in a fine grained manner,
+add a mapping function for the left-handed setting on mice, this
+will replace the right configuration value depending on the pointer
+device it is dealing with.
+
+This ensures mouse preferences don't overwrite touchpad behavior
+unless that preference is enabled.
+---
+ src/backends/meta-input-settings.c | 45 +++++++++++++++++++++++-------
+ 1 file changed, 35 insertions(+), 10 deletions(-)
+
+diff --git a/src/backends/meta-input-settings.c b/src/backends/meta-input-settings.c
+index d045315fa7..a2a6e6230f 100644
+--- a/src/backends/meta-input-settings.c
++++ b/src/backends/meta-input-settings.c
+@@ -281,6 +281,39 @@ update_touchpad_left_handed (MetaInputSettings  *input_settings,
+     }
+ }
+ 
++static gboolean
++apply_device_handedness (MetaInputSettings  *input_settings,
++                         ClutterInputDevice *device,
++                         gboolean            value)
++{
++  if ((clutter_input_device_get_capabilities (device) &
++       CLUTTER_INPUT_CAPABILITY_TOUCHPAD) != 0)
++    {
++      GDesktopTouchpadHandedness handedness;
++      MetaInputSettingsPrivate *priv;
++
++      /* Look up correct handedness on touchpads */
++      priv = meta_input_settings_get_instance_private (input_settings);
++      handedness = g_settings_get_enum (priv->touchpad_settings, "left-handed");
++
++      switch (handedness)
++        {
++        case G_DESKTOP_TOUCHPAD_HANDEDNESS_RIGHT:
++          value = FALSE;
++          break;
++        case G_DESKTOP_TOUCHPAD_HANDEDNESS_LEFT:
++          value = TRUE;
++          break;
++        case G_DESKTOP_TOUCHPAD_HANDEDNESS_MOUSE:
++          break;
++        default:
++          g_assert_not_reached ();
++        }
++    }
++
++  return value;
++}
++
+ static void
+ update_mouse_left_handed (MetaInputSettings  *input_settings,
+                           ClutterInputDevice *device)
+@@ -312,19 +345,11 @@ update_mouse_left_handed (MetaInputSettings  *input_settings,
+     }
+   else
+     {
+-      GDesktopTouchpadHandedness touchpad_handedness;
+-
+       settings_set_bool_setting (input_settings,
+-                                 CLUTTER_INPUT_CAPABILITY_POINTER, NULL,
++                                 CLUTTER_INPUT_CAPABILITY_POINTER,
++                                 apply_device_handedness,
+                                  input_settings_class->set_left_handed,
+                                  enabled);
+-
+-      touchpad_handedness = g_settings_get_enum (priv->touchpad_settings,
+-                                                 "left-handed");
+-
+-      /* Also update touchpads if they're following mouse settings */
+-      if (touchpad_handedness == G_DESKTOP_TOUCHPAD_HANDEDNESS_MOUSE)
+-        update_touchpad_left_handed (input_settings, NULL);
+     }
+ }
  
 -- 
 GitLab

@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42~rc
-Release:       2%{?dist}
+Release:       3%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -175,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Wed Mar 09 2022 Adam Williamson <awilliam@redhat.com> - 42~rc-3
+- Update MR #2331 backport
+
 * Tue Mar 08 2022 Adam Williamson <awilliam@redhat.com> - 42~rc-2
 - Backport MR #2331 for input device capabilities (#2017043)
 
