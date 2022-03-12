@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       42~rc
-Release:       4%{?dist}
+Version:       42.0
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -175,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sun Mar 13 2022 Florian Müllner <fmuellner@redhat.com> - 42.0-1
+- Update to 42.0
+
 * Thu Mar 10 2022 Adam Williamson <awilliam@redhat.com> - 42~rc-4
 - Update MR #2331 backport again
 
