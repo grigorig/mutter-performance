@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.0
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -31,6 +31,12 @@ Patch2:        mutter-42.alpha-disable-tegra.patch
 # https://gitlab.gnome.org/GNOME/mutter/-/issues/2154
 # https://bugzilla.redhat.com/show_bug.cgi?id=2017043
 Patch3:        2331.patch
+
+# Avoid crashing on reentry into mapping/unmapping cycle
+# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3165
+# https://bugzilla.redhat.com/show_bug.cgi?id=2063381
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2299
+Patch4:        2299.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -175,6 +181,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Mar 14 2022 Adam Williamson <awilliam@redhat.com> - 42.0-2
+- Backport MR #2299 to avoid a commonly-encountered crash (#2063381)
+
 * Sun Mar 13 2022 Florian Müllner <fmuellner@redhat.com> - 42.0-1
 - Update to 42.0
 
