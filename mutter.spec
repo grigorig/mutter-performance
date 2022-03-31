@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.0
-Release:       2%{?dist}
+Release:       3%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -37,6 +37,13 @@ Patch3:        2331.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2063381
 # https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2299
 Patch4:        2299.patch
+
+# Fix input to overview search freezing when using input method
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2188
+# https://bugzilla.redhat.com/show_bug.cgi?id=2062660
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2353
+Patch5:        0001-clutter-Refactor-code-marking-actors-dirty-for-paint.patch
+Patch6:        0002-clutter-Keep-actors-dirty-if-a-redraw-was-queued-up-.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -181,6 +188,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Mar 31 2022 Adam Williamson <awilliam@redhat.com> - 42.0-3
+- Backport MR #2353 to fix overview search with input methods (#2062660)
+
 * Mon Mar 14 2022 Adam Williamson <awilliam@redhat.com> - 42.0-2
 - Backport MR #2299 to avoid a commonly-encountered crash (#2063381)
 
