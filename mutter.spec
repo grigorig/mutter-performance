@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.0
-Release:       3%{?dist}
+Release:       4%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -44,6 +44,12 @@ Patch4:        2299.patch
 # https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2353
 Patch5:        0001-clutter-Refactor-code-marking-actors-dirty-for-paint.patch
 Patch6:        0002-clutter-Keep-actors-dirty-if-a-redraw-was-queued-up-.patch
+
+# Fix window switching being locked when dimming is interrupted
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2224
+# https://bugzilla.redhat.com/show_bug.cgi?id=2073206
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2333
+Patch7:        2333.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -188,6 +194,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon Apr 18 2022 Adam Williamson <awilliam@redhat.com> - 42.0-4
+- Backport MR #2333 to fix partial lock on interrupted dimming (#2073206)
+
 * Thu Mar 31 2022 Adam Williamson <awilliam@redhat.com> - 42.0-3
 - Backport MR #2353 to fix overview search with input methods (#2062660)
 
