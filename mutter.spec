@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.0
-Release:       4%{?dist}
+Release:       5%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -50,6 +50,18 @@ Patch6:        0002-clutter-Keep-actors-dirty-if-a-redraw-was-queued-up-.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2073206
 # https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2333
 Patch7:        2333.patch
+
+# Fix top bar hover issues
+# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/5289
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2321
+Patch8:        0001-clutter-Pass-target-actor-of-events-to-event-filter-.patch
+Patch9:        0002-events-Use-the-event-target-actor-to-determine-windo.patch
+
+# Fix issues with stuck modifier keys
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2194
+# https://bugzilla.redhat.com/show_bug.cgi?id=2076390
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2366
+Patch10:       2366.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -194,6 +206,10 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Tue Apr 19 2022 Adam Williamson <awilliam@redhat.com> - 42.0-5
+- Backport MR #2366 to fix stuck modifier key issues (#2076390)
+- Backport MR #2321 to fix top bar hover issues
+
 * Mon Apr 18 2022 Adam Williamson <awilliam@redhat.com> - 42.0-4
 - Backport MR #2333 to fix partial lock on interrupted dimming (#2073206)
 
