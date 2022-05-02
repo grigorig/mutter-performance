@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.0
-Release:       5%{?dist}
+Release:       6%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -62,6 +62,13 @@ Patch9:        0002-events-Use-the-event-target-actor-to-determine-windo.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2076390
 # https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2366
 Patch10:       2366.patch
+
+# Fix graphics initialization on legacy Radeon
+# https://gitlab.gnome.org/GNOME/mutter/-/issues/2210
+# https://bugzilla.redhat.com/show_bug.cgi?id=2081070
+# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2359
+Patch11:       0001-kms-impl-device-Add-addfb2_modifiers-to-MetaKmsDevic.patch
+Patch12:       0002-kms-device-Disable-modifiers-when-DRM_CAP_ADDFB2_MOD.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -206,6 +213,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Mon May 02 2022 Adam Williamson <awilliam@redhat.com> - 42.0-6
+- Backport MR #2359 to fix GNOME on legacy Radeon (#2081070)
+
 * Tue Apr 19 2022 Adam Williamson <awilliam@redhat.com> - 42.0-5
 - Backport MR #2366 to fix stuck modifier key issues (#2076390)
 - Backport MR #2321 to fix top bar hover issues
