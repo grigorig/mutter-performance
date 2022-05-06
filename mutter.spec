@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       42.0
-Release:       6%{?dist}
+Version:       42.1
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,50 +25,6 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1936991
 Patch2:        mutter-42.alpha-disable-tegra.patch
-
-# Handle input devices with multiple capabilities properly
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2331
-# https://gitlab.gnome.org/GNOME/mutter/-/issues/2154
-# https://bugzilla.redhat.com/show_bug.cgi?id=2017043
-Patch3:        2331.patch
-
-# Avoid crashing on reentry into mapping/unmapping cycle
-# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3165
-# https://bugzilla.redhat.com/show_bug.cgi?id=2063381
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2299
-Patch4:        2299.patch
-
-# Fix input to overview search freezing when using input method
-# https://gitlab.gnome.org/GNOME/mutter/-/issues/2188
-# https://bugzilla.redhat.com/show_bug.cgi?id=2062660
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2353
-Patch5:        0001-clutter-Refactor-code-marking-actors-dirty-for-paint.patch
-Patch6:        0002-clutter-Keep-actors-dirty-if-a-redraw-was-queued-up-.patch
-
-# Fix window switching being locked when dimming is interrupted
-# https://gitlab.gnome.org/GNOME/mutter/-/issues/2224
-# https://bugzilla.redhat.com/show_bug.cgi?id=2073206
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2333
-Patch7:        2333.patch
-
-# Fix top bar hover issues
-# https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/5289
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2321
-Patch8:        0001-clutter-Pass-target-actor-of-events-to-event-filter-.patch
-Patch9:        0002-events-Use-the-event-target-actor-to-determine-windo.patch
-
-# Fix issues with stuck modifier keys
-# https://gitlab.gnome.org/GNOME/mutter/-/issues/2194
-# https://bugzilla.redhat.com/show_bug.cgi?id=2076390
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2366
-Patch10:       2366.patch
-
-# Fix graphics initialization on legacy Radeon
-# https://gitlab.gnome.org/GNOME/mutter/-/issues/2210
-# https://bugzilla.redhat.com/show_bug.cgi?id=2081070
-# https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/2359
-Patch11:       0001-kms-impl-device-Add-addfb2_modifiers-to-MetaKmsDevic.patch
-Patch12:       0002-kms-device-Disable-modifiers-when-DRM_CAP_ADDFB2_MOD.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -213,6 +169,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Fri May 06 2022 Florian Müllner <fmuellner@redhat.com> - 42.1-1
+- Update to 42.1
+
 * Mon May 02 2022 Adam Williamson <awilliam@redhat.com> - 42.0-6
 - Backport MR #2359 to fix GNOME on legacy Radeon (#2081070)
 
