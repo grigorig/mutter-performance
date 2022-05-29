@@ -9,8 +9,8 @@
 %global tarball_version %%(echo %{version} | tr '~' '.')
 
 Name:          mutter
-Version:       42.1
-Release:       2%{?dist}
+Version:       42.2
+Release:       1%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -169,6 +169,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Sun May 29 2022 Florian Müllner <fmuellner@redhat.com> - 42.2-1
+- Update to 42.2
+
 * Thu May 19 2022 Florian Müllner <fmuellner@redhat.com> - 42.1-2
 - Rebuild for bodhi
 
