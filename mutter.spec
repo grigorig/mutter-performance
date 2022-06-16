@@ -10,7 +10,7 @@
 
 Name:          mutter
 Version:       42.2
-Release:       1%{?dist}
+Release:       100%{?dist}
 Summary:       Window and compositing manager based on Clutter
 
 License:       GPLv2+
@@ -25,6 +25,12 @@ Patch1:        0001-Revert-build-Do-not-provide-built-sources-as-libmutt.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1936991
 Patch2:        mutter-42.alpha-disable-tegra.patch
+
+# Max opaque rects increase
+Patch3:        max-rects.diff
+
+# Triple buffering
+Patch4:        Support-Dynamic-triple-double-buffering.patch
 
 BuildRequires: pkgconfig(gobject-introspection-1.0) >= 1.41.0
 BuildRequires: pkgconfig(sm)
@@ -169,6 +175,9 @@ desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
 %{_datadir}/mutter-%{mutter_api_version}/tests
 
 %changelog
+* Thu Jun 16 2022 Grigori Goronzy <greg@kinoho.net> - 42.2-100
+- Add performance patches
+
 * Sun May 29 2022 Florian Müllner <fmuellner@redhat.com> - 42.2-1
 - Update to 42.2
 
