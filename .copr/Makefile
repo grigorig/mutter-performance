@@ -1,3 +1,4 @@
+rpmbuild_src = $(shell rpmbuild --eval '%{_sourcedir}')
 .PHONY: prepare srpm rpm
 
 prepare:
